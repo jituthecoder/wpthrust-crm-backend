@@ -66,6 +66,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('role:super_admin')->group(function () {
 
+        /*
+        |--------------------------------------------------------------------------
+        | Businesses
+        |--------------------------------------------------------------------------
+        */
+
         Route::get('/businesses', [BusinessController::class, 'index']);
 
         Route::get('/businesses/{business}', [BusinessController::class, 'show']);
@@ -73,6 +79,20 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/businesses/import', [BusinessImportController::class, 'import']);
 
         Route::post('/businesses/assign', [LeadController::class, 'assign']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Users
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/users', [UserController::class, 'index']);
+
+        Route::post('/users', [UserController::class, 'store']);
+
+        Route::put('/users/{user}', [UserController::class, 'update']);
+
+        Route::delete('/users/{user}', [UserController::class, 'destroy']);
 
         Route::get('/users/sales-executives', [UserController::class, 'salesExecutives']);
 

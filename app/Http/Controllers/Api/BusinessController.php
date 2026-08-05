@@ -78,6 +78,15 @@ class BusinessController extends Controller
 
         }
 
+        if ($request->filled('assigned_user_id')) {
+
+            $query->where(
+                'assigned_user_id',
+                $request->assigned_user_id
+            );
+
+        }
+
         /*
         |--------------------------------------------------------------------------
         | Sorting

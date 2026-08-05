@@ -126,6 +126,24 @@ class LeadController extends Controller
 
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Assigned User Filter
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            auth()->user()->role === 'super_admin' &&
+            $request->filled('assigned_user_id')
+        ) {
+
+            $query->where(
+                'assigned_user_id',
+                $request->assigned_user_id
+            );
+
+        }
+
         $leads = $query
             ->latest()
             ->paginate(20);
