@@ -8,6 +8,10 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\LeadController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FollowupController;
+use App\Http\Controllers\Api\EmailSenderController;
+use App\Http\Controllers\Api\EmailTemplateController;
+use App\Http\Controllers\Api\TemplateVariableController;
+use App\Http\Controllers\Api\EmailCampaignController;
 
 /*
 |--------------------------------------------------------------------------
@@ -95,6 +99,93 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/users/{user}', [UserController::class, 'destroy']);
 
         Route::get('/users/sales-executives', [UserController::class, 'salesExecutives']);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Email Senders
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/email-senders', [EmailSenderController::class, 'index']);
+        Route::post('/email-senders', [EmailSenderController::class, 'store']);
+        Route::get('/email-senders/{emailSender}', [EmailSenderController::class, 'show']);
+        Route::put('/email-senders/{emailSender}', [EmailSenderController::class, 'update']);
+        Route::delete('/email-senders/{emailSender}', [EmailSenderController::class, 'destroy']);
+
+        Route::post('/email-senders/{emailSender}/test', [EmailSenderController::class, 'test']);
+        Route::post(
+            '/email-senders/{emailSender}/send-test',
+            [EmailSenderController::class, 'sendTest']
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Email Templates
+        |--------------------------------------------------------------------------
+        */
+
+        Route::apiResource(
+            'email-templates',
+            EmailTemplateController::class
+        );
+
+        Route::post(
+            'email-templates/{emailTemplate}/publish',
+            [EmailTemplateController::class, 'publish']
+        );
+
+        Route::post(
+            'email-templates/{emailTemplate}/duplicate',
+            [EmailTemplateController::class, 'duplicate']
+        );
+
+        Route::get(
+            'email-templates/{emailTemplate}/versions',
+            [EmailTemplateController::class, 'versions']
+        );
+
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Template Variables
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            'template-variables',
+            [TemplateVariableController::class, 'index']
+        );
+
+        Route::post(
+            'template-variables/preview',
+            [TemplateVariableController::class, 'preview']
+        );
+
+        Route::post(
+            'template-variables/render',
+            [TemplateVariableController::class, 'render']
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Email Campaigns
+        |--------------------------------------------------------------------------
+        */
+
+        Route::apiResource(
+            'email-campaigns',
+            EmailCampaignController::class
+        );
+
+        Route::post(
+            'email-campaigns/{emailCampaign}/start',
+            [EmailCampaignController::class, 'start']
+        );
+            
 
     });
 
