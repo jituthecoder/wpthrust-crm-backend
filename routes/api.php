@@ -184,8 +184,46 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post(
             'email-campaigns/{emailCampaign}/start',
             [EmailCampaignController::class, 'start']
+
         );
-            
+
+        Route::post(
+            'email-campaigns/{emailCampaign}/pause',
+            [EmailCampaignController::class, 'pause']
+        );
+
+        Route::post(
+            'email-campaigns/{emailCampaign}/resume',
+            [EmailCampaignController::class, 'resume']
+        );
+
+        Route::post(
+            'email-campaigns/{emailCampaign}/leads',
+            [EmailCampaignController::class, 'assignLeads']
+        );
+
+        Route::get(
+            'email-campaigns/{emailCampaign}/stats',
+            [EmailCampaignController::class, 'stats']
+        );
+
+        Route::get(
+            'email-campaigns/{emailCampaign}/leads',
+            [EmailCampaignController::class, 'leads']
+        );
+
+        Route::post(
+            'email-campaigns/{emailCampaign}/leads/retry-all',
+            [EmailCampaignController::class, 'retryAllFailedLeads']
+        );
+        
+        Route::post(
+            'email-campaigns/{emailCampaign}/leads/{campaignLead}/retry',
+            [EmailCampaignController::class, 'retryLead']
+        );
+
+        
+
 
     });
 

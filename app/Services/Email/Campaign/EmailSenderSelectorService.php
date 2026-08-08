@@ -19,7 +19,10 @@ class EmailSenderSelectorService
         */
 
         $senders = CampaignSender::with('sender')
-            ->where('email_campaign_id', $lead->email_campaign_id)
+            ->where(
+                'email_campaign_id',
+                $lead->email_campaign_id
+            )
             ->where('is_active', true)
             ->orderBy('priority')
             ->orderBy('id')
@@ -31,16 +34,16 @@ class EmailSenderSelectorService
 
         /*
         |--------------------------------------------------------------------------
-        | Daily / Hourly Limit
+        | Filter Senders By Limits
         |--------------------------------------------------------------------------
         */
 
-        foreach ($senders as $campaignSender) {
+        $availableSenders = $senders->filter(function ($campaignSender) {
 
             $sender = $campaignSender->sender;
 
             if (!$sender) {
-                continue;
+                return false;
             }
 
             /*
@@ -53,7 +56,7 @@ class EmailSenderSelectorService
                 $sender->daily_limit &&
                 $sender->sent_today >= $sender->daily_limit
             ) {
-                continue;
+                return false;
             }
 
             /*
@@ -66,12 +69,41 @@ class EmailSenderSelectorService
                 $sender->hourly_limit &&
                 $sender->sent_this_hour >= $sender->hourly_limit
             ) {
-                continue;
+                return false;
             }
 
-            return $campaignSender;
+            return true;
+
+        })->values();
+
+        if ($availableSenders->isEmpty()) {
+            return null;
         }
 
-        return null;
+        /*
+        |--------------------------------------------------------------------------
+        | Determine Lead Position
+        |--------------------------------------------------------------------------
+        |
+        | Find how many campaign leads exist before this lead.
+        |
+        */
+
+        $leadPosition = CampaignLead::where(
+            'email_campaign_id',
+            $lead->email_campaign_id
+        )
+        ->where('id', '<=', $lead->id)
+        ->count() - 1;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Round Robin
+        |--------------------------------------------------------------------------
+        */
+
+        $senderIndex = $leadPosition % $availableSenders->count();
+
+        return $availableSenders->get($senderIndex);
     }
 }

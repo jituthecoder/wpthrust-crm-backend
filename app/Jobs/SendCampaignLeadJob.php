@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use App\Services\Email\EmailCampaignService;
 
 class SendCampaignLeadJob implements ShouldQueue
 {
@@ -44,7 +45,8 @@ class SendCampaignLeadJob implements ShouldQueue
     public function handle(
         EmailSenderSelectorService $senderSelector,
         TemplateRendererService $renderer,
-        CampaignMailerService $mailer
+        CampaignMailerService $mailer,
+        EmailCampaignService $campaignService
     ): void {
 
         /*
@@ -67,7 +69,30 @@ class SendCampaignLeadJob implements ShouldQueue
             return;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Check Lead Status
+        |--------------------------------------------------------------------------
+        */
+
         if ($lead->status !== 'pending') {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Check Campaign Status
+        |--------------------------------------------------------------------------
+        |
+        | Only send emails when the campaign is running.
+        |
+        */
+
+        if (!$lead->campaign) {
+            return;
+        }
+
+        if ($lead->campaign->status !== 'running') {
             return;
         }
 
@@ -102,6 +127,14 @@ class SendCampaignLeadJob implements ShouldQueue
             }
 
             $sender = $campaignSender->sender;
+
+            if (!$sender) {
+
+                throw new \Exception(
+                    'Email sender not found.'
+                );
+
+            }
 
             /*
             |--------------------------------------------------------------------------
@@ -145,6 +178,29 @@ class SendCampaignLeadJob implements ShouldQueue
 
             /*
             |--------------------------------------------------------------------------
+            | Check Campaign Status Again
+            |--------------------------------------------------------------------------
+            |
+            | The campaign could have been paused while this job
+            | was processing.
+            |
+            */
+
+            $lead->campaign->refresh();
+
+            if ($lead->campaign->status !== 'running') {
+
+                $lead->update([
+
+                    'status' => 'pending',
+
+                ]);
+
+                return;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
             | Send Email
             |--------------------------------------------------------------------------
             */
@@ -165,25 +221,43 @@ class SendCampaignLeadJob implements ShouldQueue
 
             $lead->update([
 
-                'status' => 'sent',
+                'status' =>
+                    'sent',
 
-                'email_sender_id' => $sender->id,
+                'email_sender_id' =>
+                    $sender->id,
 
-                'email_template_version_id' => $version->id,
+                'email_template_version_id' =>
+                    $version->id,
 
-                'sent_at' => now(),
+                'sent_at' =>
+                    now(),
 
             ]);
 
             /*
             |--------------------------------------------------------------------------
-            | Update Sender Statistics
+            | Check Campaign Completion
             |--------------------------------------------------------------------------
             */
 
-            $sender->increment('sent_today');
+            $campaignService->completeIfFinished(
+                $lead->campaign
+            );
 
-            $sender->increment('sent_this_hour');
+            /*
+            |--------------------------------------------------------------------------
+            | Update Global Sender Statistics
+            |--------------------------------------------------------------------------
+            */
+
+            $sender->increment(
+                'sent_today'
+            );
+
+            $sender->increment(
+                'sent_this_hour'
+            );
 
             $sender->update([
 
@@ -191,20 +265,58 @@ class SendCampaignLeadJob implements ShouldQueue
 
             ]);
 
-        } catch (\Throwable $e) {
+            /*
+            |--------------------------------------------------------------------------
+            | Update Campaign Sender Statistics
+            |--------------------------------------------------------------------------
+            */
 
-            $lead->update([
+            $campaignSender->increment(
+                'sent_count'
+            );
 
-                'status' => 'failed',
+            $campaignSender->update([
 
-                'failure_reason' => $e->getMessage(),
-
-                'retry_count' => $lead->retry_count + 1,
+                'last_sent_at' => now(),
 
             ]);
 
-            throw $e;
+        } catch (\Throwable $e) {
 
+            /*
+            |--------------------------------------------------------------------------
+            | Update Lead Failure
+            |--------------------------------------------------------------------------
+            */
+
+            $lead->update([
+
+                'status' =>
+                    'failed',
+
+                'failure_reason' =>
+                    $e->getMessage(),
+
+                'retry_count' =>
+                    $lead->retry_count + 1,
+
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Update Campaign Sender Failure Statistics
+            |--------------------------------------------------------------------------
+            */
+
+            if (isset($campaignSender)) {
+
+                $campaignSender->increment(
+                    'failed_count'
+                );
+
+            }
+
+            throw $e;
         }
     }
 }

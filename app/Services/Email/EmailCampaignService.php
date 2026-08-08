@@ -2,14 +2,31 @@
 
 namespace App\Services\Email;
 
+use App\Models\Business;
 use App\Models\CampaignLead;
 use App\Models\CampaignSender;
 use App\Models\EmailCampaign;
+use App\Services\Email\Campaign\CampaignStarterService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Jobs\SendCampaignLeadJob;
 
 class EmailCampaignService
 {
+    /**
+     * Campaign Starter Service
+     */
+    protected CampaignStarterService $campaignStarter;
+
+    /**
+     * Constructor
+     */
+    public function __construct(
+        CampaignStarterService $campaignStarter
+    ) {
+        $this->campaignStarter = $campaignStarter;
+    }
+
     /**
      * Create Campaign
      */
@@ -19,25 +36,39 @@ class EmailCampaignService
 
             /*
             |--------------------------------------------------------------------------
+            | Get Businesses With Email
+            |--------------------------------------------------------------------------
+            */
+
+            $businesses = Business::whereIn(
+                'id',
+                $data['businesses']
+            )
+                ->whereNotNull('email')
+                ->where('email', '!=', '')
+                ->get();
+
+            /*
+            |--------------------------------------------------------------------------
             | Create Campaign
             |--------------------------------------------------------------------------
             */
 
             $campaign = EmailCampaign::create([
 
-                'name'              => $data['name'],
+                'name' => $data['name'],
 
-                'description'       => $data['description'] ?? null,
+                'description' => $data['description'] ?? null,
 
                 'email_template_id' => $data['email_template_id'],
 
-                'scheduled_at'      => $data['scheduled_at'] ?? null,
+                'scheduled_at' => $data['scheduled_at'] ?? null,
 
-                'status'            => empty($data['scheduled_at'])
-                                        ? 'draft'
-                                        : 'scheduled',
+                'status' => empty($data['scheduled_at'])
+                    ? 'draft'
+                    : 'scheduled',
 
-                'created_by'        => Auth::id(),
+                'created_by' => Auth::id(),
 
             ]);
 
@@ -53,20 +84,19 @@ class EmailCampaignService
 
                     'email_campaign_id' => $campaign->id,
 
-                    'email_sender_id'   => $senderId,
+                    'email_sender_id' => $senderId,
 
-                    'priority'          => 1,
+                    'priority' => 1,
 
-                    'weight'            => 1,
+                    'weight' => 1,
 
-                    'daily_limit'       => null,
+                    'daily_limit' => null,
 
-                    'hourly_limit'      => null,
+                    'hourly_limit' => null,
 
-                    'is_active'         => true,
+                    'is_active' => true,
 
                 ]);
-
             }
 
             /*
@@ -75,20 +105,19 @@ class EmailCampaignService
             |--------------------------------------------------------------------------
             */
 
-            foreach ($data['businesses'] as $businessId) {
+            foreach ($businesses as $business) {
 
                 CampaignLead::create([
 
-                    'email_campaign_id'         => $campaign->id,
+                    'email_campaign_id' => $campaign->id,
 
-                    'business_id'               => $businessId,
+                    'business_id' => $business->id,
 
                     'email_template_version_id' => null,
 
-                    'status'                    => 'pending',
+                    'status' => 'pending',
 
                 ]);
-
             }
 
             /*
@@ -99,9 +128,15 @@ class EmailCampaignService
 
             $campaign->update([
 
-                'total_leads' => count($data['businesses'])
+                'total_leads' => $businesses->count(),
 
             ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Return Campaign
+            |--------------------------------------------------------------------------
+            */
 
             return $campaign->load([
 
@@ -114,9 +149,9 @@ class EmailCampaignService
                 'leads.business',
 
             ]);
-
         });
     }
+
 
     /**
      * Update Campaign
@@ -139,13 +174,13 @@ class EmailCampaignService
 
             $campaign->update([
 
-                'name'              => $data['name'],
+                'name' => $data['name'],
 
-                'description'       => $data['description'] ?? null,
+                'description' => $data['description'] ?? null,
 
                 'email_template_id' => $data['email_template_id'],
 
-                'scheduled_at'      => $data['scheduled_at'] ?? null,
+                'scheduled_at' => $data['scheduled_at'] ?? null,
 
             ]);
 
@@ -156,17 +191,13 @@ class EmailCampaignService
             */
 
             CampaignSender::where(
-
                 'email_campaign_id',
                 $campaign->id
-
             )->delete();
 
             CampaignLead::where(
-
                 'email_campaign_id',
                 $campaign->id
-
             )->delete();
 
             /*
@@ -177,71 +208,101 @@ class EmailCampaignService
 
             $senderRows = [];
 
-                foreach ($data['senders'] as $senderId) {
+            foreach ($data['senders'] as $senderId) {
 
-                    $senderRows[] = [
+                $senderRows[] = [
 
-                        'email_campaign_id' => $campaign->id,
+                    'email_campaign_id' => $campaign->id,
 
-                        'email_sender_id'   => $senderId,
+                    'email_sender_id' => $senderId,
 
-                        'priority'          => 1,
+                    'priority' => 1,
 
-                        'weight'            => 1,
+                    'weight' => 1,
 
-                        'daily_limit'       => null,
+                    'daily_limit' => null,
 
-                        'hourly_limit'      => null,
+                    'hourly_limit' => null,
 
-                        'is_active'         => true,
+                    'is_active' => true,
 
-                        'created_at'        => now(),
+                    'created_at' => now(),
 
-                        'updated_at'        => now(),
+                    'updated_at' => now(),
 
-                    ];
+                ];
+            }
 
-                }
+            if (!empty($senderRows)) {
 
                 CampaignSender::insert($senderRows);
 
+            }
+
             /*
             |--------------------------------------------------------------------------
-            | Add Businesses
+            | Get Businesses With Email
+            |--------------------------------------------------------------------------
+            */
+
+            $businesses = Business::whereIn(
+                'id',
+                $data['businesses']
+            )
+                ->whereNotNull('email')
+                ->where('email', '!=', '')
+                ->get();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Add Campaign Leads
             |--------------------------------------------------------------------------
             */
 
             $leadRows = [];
 
-            foreach ($data['businesses'] as $businessId) {
+            foreach ($businesses as $business) {
 
                 $leadRows[] = [
 
-                    'email_campaign_id'         => $campaign->id,
+                    'email_campaign_id' => $campaign->id,
 
-                    'business_id'               => $businessId,
+                    'business_id' => $business->id,
 
                     'email_template_version_id' => null,
 
-                    'status'                    => 'pending',
+                    'status' => 'pending',
 
-                    'created_at'                => now(),
+                    'created_at' => now(),
 
-                    'updated_at'                => now(),
+                    'updated_at' => now(),
 
                 ];
+            }
+
+            if (!empty($leadRows)) {
+
+                CampaignLead::insert($leadRows);
 
             }
 
-            CampaignLead::insert($leadRows);
+            /*
+            |--------------------------------------------------------------------------
+            | Update Statistics
+            |--------------------------------------------------------------------------
+            */
 
             $campaign->update([
 
-                'total_leads' => count(
-                    $data['businesses']
-                )
+                'total_leads' => $businesses->count(),
 
             ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Return Campaign
+            |--------------------------------------------------------------------------
+            */
 
             return $campaign->load([
 
@@ -254,9 +315,566 @@ class EmailCampaignService
                 'leads.business',
 
             ]);
-
         });
+    }
 
+
+    /**
+     * Assign Businesses to Campaign
+     */
+    public function assignLeads(
+        EmailCampaign $campaign,
+        array $businessIds
+    ): EmailCampaign {
+
+        return DB::transaction(function () use (
+            $campaign,
+            $businessIds
+        ) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Get Eligible Businesses
+            |--------------------------------------------------------------------------
+            | Only businesses with an email address can be added.
+            |--------------------------------------------------------------------------
+            */
+
+            $businesses = Business::whereIn(
+                'id',
+                $businessIds
+            )
+                ->whereNotNull('email')
+                ->where('email', '!=', '')
+                ->get();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Existing Campaign Leads
+            |--------------------------------------------------------------------------
+            */
+
+            $existingBusinessIds = CampaignLead::where(
+                'email_campaign_id',
+                $campaign->id
+            )
+                ->whereIn(
+                    'business_id',
+                    $businesses->pluck('id')
+                )
+                ->pluck('business_id')
+                ->toArray();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Create New Campaign Leads
+            |--------------------------------------------------------------------------
+            */
+
+            $leadRows = [];
+
+            foreach ($businesses as $business) {
+
+                // Already assigned to this campaign
+                if (in_array(
+                    $business->id,
+                    $existingBusinessIds
+                )) {
+                    continue;
+                }
+
+                $leadRows[] = [
+
+                    'email_campaign_id' =>
+                        $campaign->id,
+
+                    'business_id' =>
+                        $business->id,
+
+                    'email_template_version_id' =>
+                        null,
+
+                    'status' =>
+                        'pending',
+
+                    'created_at' =>
+                        now(),
+
+                    'updated_at' =>
+                        now(),
+
+                ];
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Insert Leads
+            |--------------------------------------------------------------------------
+            */
+
+            if (!empty($leadRows)) {
+
+                CampaignLead::insert($leadRows);
+
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Update Campaign Statistics
+            |--------------------------------------------------------------------------
+            */
+
+            $campaign->update([
+
+                'total_leads' => CampaignLead::where(
+                    'email_campaign_id',
+                    $campaign->id
+                )->count(),
+
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Return Updated Campaign
+            |--------------------------------------------------------------------------
+            */
+
+            return $campaign->fresh()->load([
+
+                'template',
+
+                'creator',
+
+                'senders.sender',
+
+                'leads.business',
+
+            ]);
+        });
+    }
+
+
+    /**
+     * Pause Campaign
+     */
+    public function pause(
+        EmailCampaign $campaign
+    ): EmailCampaign {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validate Campaign Status
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->status !== 'running') {
+
+            throw new \Exception(
+                'Only a running campaign can be paused.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pause Campaign
+        |--------------------------------------------------------------------------
+        */
+
+        $campaign->update([
+
+            'status' => 'paused',
+
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Return Campaign
+        |--------------------------------------------------------------------------
+        */
+
+        return $campaign->fresh()->load([
+
+            'template',
+
+            'creator',
+
+            'senders.sender',
+
+            'leads.business',
+
+        ]);
+    }
+
+
+    /**
+     * Resume Campaign
+     */
+    public function resume(
+        EmailCampaign $campaign
+    ): EmailCampaign {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Resume Through Campaign Starter
+        |--------------------------------------------------------------------------
+        |
+        | CampaignStarterService will:
+        |
+        | 1. Validate paused status
+        | 2. Change status to running
+        | 3. Find pending leads
+        | 4. Dispatch pending leads to queue
+        |
+        |--------------------------------------------------------------------------
+        */
+
+        $campaign = $this->campaignStarter->resume(
+            $campaign
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Return Campaign With Relations
+        |--------------------------------------------------------------------------
+        */
+
+        return $campaign->load([
+
+            'template',
+
+            'creator',
+
+            'senders.sender',
+
+            'leads.business',
+
+        ]);
+    }
+
+
+    /**
+     * Get Campaign Statistics
+     */
+    public function stats(
+        EmailCampaign $campaign
+    ): array {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Lead Counts
+        |--------------------------------------------------------------------------
+        */
+
+        $total = $campaign->leads()->count();
+
+        $pending = $campaign->leads()
+            ->where('status', 'pending')
+            ->count();
+
+        $processing = $campaign->leads()
+            ->where('status', 'processing')
+            ->count();
+
+        $sent = $campaign->leads()
+            ->where('status', 'sent')
+            ->count();
+
+        $failed = $campaign->leads()
+            ->where('status', 'failed')
+            ->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Progress
+        |--------------------------------------------------------------------------
+        */
+
+        $processed = $sent + $failed;
+
+        $progress = $total > 0
+            ? round(($processed / $total) * 100, 2)
+            : 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Return Statistics
+        |--------------------------------------------------------------------------
+        */
+
+        return [
+
+            'campaign_id' => $campaign->id,
+
+            'status' => $campaign->status,
+
+            'total_leads' => $total,
+
+            'pending' => $pending,
+
+            'processing' => $processing,
+
+            'sent' => $sent,
+
+            'failed' => $failed,
+
+            'processed' => $processed,
+
+            'progress' => $progress,
+
+        ];
+    }
+
+
+    /**
+     * Mark Campaign Completed If All Leads Are Processed
+     */
+    public function completeIfFinished(
+        EmailCampaign $campaign
+    ): bool {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Do Not Process Already Completed Campaign
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->status === 'completed') {
+            return true;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Count Remaining Leads
+        |--------------------------------------------------------------------------
+        */
+
+        $pending = $campaign->leads()
+            ->where('status', 'pending')
+            ->count();
+
+        $processing = $campaign->leads()
+            ->where('status', 'processing')
+            ->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Campaign Still Has Work
+        |--------------------------------------------------------------------------
+        */
+
+        if ($pending > 0 || $processing > 0) {
+            return false;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Make Sure Campaign Actually Has Leads
+        |--------------------------------------------------------------------------
+        */
+
+        $total = $campaign->leads()->count();
+
+        if ($total === 0) {
+            return false;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Mark Campaign Completed
+        |--------------------------------------------------------------------------
+        */
+
+        $campaign->update([
+            'status' => 'completed',
+        ]);
+
+        return true;
+    }
+
+
+    /**
+     * Get Campaign Leads
+     */
+    public function leads(
+        EmailCampaign $campaign,
+        array $filters = []
+    ) {
+        $query = $campaign->leads()
+            ->with([
+                'business',
+                'sender',
+            ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Status Filter
+        |--------------------------------------------------------------------------
+        */
+
+        if (!empty($filters['status'])) {
+            $query->where(
+                'status',
+                $filters['status']
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Search
+        |--------------------------------------------------------------------------
+        */
+
+        if (!empty($filters['search'])) {
+
+            $search = trim($filters['search']);
+
+            $query->whereHas('business', function ($q) use ($search) {
+
+                $q->where('business_name', 'LIKE', "%{$search}%")
+                    ->orWhere('email', 'LIKE', "%{$search}%");
+
+            });
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pagination
+        |--------------------------------------------------------------------------
+        */
+
+        $perPage = min(
+            (int) ($filters['per_page'] ?? 20),
+            100
+        );
+
+        return $query
+            ->latest('id')
+            ->paginate($perPage);
+    }
+
+
+    /**
+     * Retry All Failed Campaign Leads
+     */
+    public function retryAllFailedLeads(
+    EmailCampaign $campaign
+    ): array {
+
+    return DB::transaction(function () use ($campaign) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Get Failed Leads Eligible For Retry
+        |--------------------------------------------------------------------------
+        */
+
+        $leads = CampaignLead::where(
+            'email_campaign_id',
+            $campaign->id
+        )
+            ->where('status', 'failed')
+            ->whereColumn('retry_count', '<', 'max_retry')
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | No Leads Available
+        |--------------------------------------------------------------------------
+        */
+
+        if ($leads->isEmpty()) {
+
+            return [
+                'queued' => 0,
+                'skipped' => CampaignLead::where(
+                    'email_campaign_id',
+                    $campaign->id
+                )
+                    ->where('status', 'failed')
+                    ->count(),
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Make Campaign Running
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $campaign->status === 'completed' ||
+            $campaign->status === 'paused' ||
+            $campaign->status === 'draft'
+        ) {
+
+            $campaign->update([
+                'status' => 'running',
+            ]);
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Reset Failed Leads
+        |--------------------------------------------------------------------------
+        */
+
+        foreach ($leads as $lead) {
+
+            $lead->update([
+
+                'status' => 'pending',
+
+                'failure_reason' => null,
+
+                'processing_started_at' => null,
+
+                'last_attempt_at' => null,
+
+                'sent_at' => null,
+
+                'provider_message_id' => null,
+
+                'provider_thread_id' => null,
+
+            ]);
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Dispatch Jobs After Transaction
+        |--------------------------------------------------------------------------
+        */
+
+        foreach ($leads as $lead) {
+
+            SendCampaignLeadJob::dispatch(
+                $lead->id
+            )->afterCommit();
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Return Statistics
+        |--------------------------------------------------------------------------
+        */
+
+        return [
+
+            'queued' => $leads->count(),
+
+            'skipped' => CampaignLead::where(
+                'email_campaign_id',
+                $campaign->id
+            )
+                ->where('status', 'failed')
+                ->count(),
+
+        ];
+
+    });
     }
 
     /**
@@ -269,5 +887,4 @@ class EmailCampaignService
         $campaign->delete();
 
     }
-
 }
