@@ -70,90 +70,100 @@ class OAuthController extends Controller
      */
     public function googleCallback(Request $request)
     {
-        $code = $request->query('code');
-        $error = $request->query('error');
-        $frontendUrl = env('FRONTEND_URL', 'https://crm.wpthrust.in');
+        $frontendUrl = rtrim(env('FRONTEND_URL', 'https://crm.wpthrust.in'), '/');
+        $redirectTabUrl = $frontendUrl . '/email-campaigns?tab=senders';
 
-        if ($error || empty($code)) {
-            return redirect($frontendUrl . '/email-campaigns?oauth_error=' . urlencode($error ?? 'Authorization code missing'));
-        }
+        try {
+            $code = $request->query('code');
+            $error = $request->query('error');
 
-        $clientId = config('services.google.client_id') ?: env('GOOGLE_CLIENT_ID');
-        $clientSecret = config('services.google.client_secret') ?: env('GOOGLE_CLIENT_SECRET');
-        $redirectUri = config('services.google.redirect_uri') ?: env('GOOGLE_REDIRECT_URI', 'https://api-crm.wpthrust.in/api/oauth/google/callback');
+            if ($error || empty($code)) {
+                return redirect($redirectTabUrl . '&oauth_error=' . urlencode($error ?? 'Authorization code missing'));
+            }
 
-        // Exchange authorization code for access & refresh tokens
-        $tokenResponse = Http::asForm()->post('https://oauth2.googleapis.com/token', [
-            'client_id' => $clientId,
-            'client_secret' => $clientSecret,
-            'redirect_uri' => $redirectUri,
-            'grant_type' => 'authorization_code',
-            'code' => $code,
-        ]);
+            $clientId = config('services.google.client_id') ?: env('GOOGLE_CLIENT_ID');
+            $clientSecret = config('services.google.client_secret') ?: env('GOOGLE_CLIENT_SECRET');
+            $redirectUri = config('services.google.redirect_uri') ?: env('GOOGLE_REDIRECT_URI', 'https://api-crm.wpthrust.in/api/oauth/google/callback');
 
-        if (!$tokenResponse->successful()) {
-            $err = $tokenResponse->json('error_description') ?? 'Failed to exchange authorization code';
-            return redirect($frontendUrl . '/email-campaigns?oauth_error=' . urlencode($err));
-        }
+            if (empty($clientId) || empty($clientSecret)) {
+                return redirect($redirectTabUrl . '&oauth_error=' . urlencode('GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing in server .env'));
+            }
 
-        $tokenData = $tokenResponse->json();
-        $accessToken = $tokenData['access_token'] ?? null;
-        $refreshToken = $tokenData['refresh_token'] ?? null;
-        $expiresIn = $tokenData['expires_in'] ?? 3599;
+            // Exchange authorization code for access & refresh tokens
+            $tokenResponse = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+                'client_id' => $clientId,
+                'client_secret' => $clientSecret,
+                'redirect_uri' => $redirectUri,
+                'grant_type' => 'authorization_code',
+                'code' => $code,
+            ]);
 
-        // Fetch Google User Profile
-        $userInfoRes = Http::withToken($accessToken)->get('https://www.googleapis.com/oauth2/v2/userinfo');
-        if (!$userInfoRes->successful()) {
-            return redirect($frontendUrl . '/email-campaigns?oauth_error=Failed+to+fetch+Google+user+profile');
-        }
+            if (!$tokenResponse->successful()) {
+                $err = $tokenResponse->json('error_description') ?? $tokenResponse->json('error') ?? 'Failed to exchange authorization code with Google';
+                return redirect($redirectTabUrl . '&oauth_error=' . urlencode($err));
+            }
 
-        $userInfo = $userInfoRes->json();
-        $email = $userInfo['email'] ?? null;
-        $name = $userInfo['name'] ?? $userInfo['given_name'] ?? 'Google Sender';
+            $tokenData = $tokenResponse->json();
+            $accessToken = $tokenData['access_token'] ?? null;
+            $refreshToken = $tokenData['refresh_token'] ?? null;
+            $expiresIn = $tokenData['expires_in'] ?? 3599;
 
-        if (empty($email)) {
-            return redirect($frontendUrl . '/email-campaigns?oauth_error=Google+profile+did+not+provide+email');
-        }
+            // Fetch Google User Profile
+            $userInfoRes = Http::withToken($accessToken)->get('https://www.googleapis.com/oauth2/v2/userinfo');
+            if (!$userInfoRes->successful()) {
+                return redirect($redirectTabUrl . '&oauth_error=Failed+to+fetch+Google+user+profile');
+            }
 
-        // Decode state if present
-        $stateRaw = $request->query('state');
-        $stateData = json_decode(base64_decode($stateRaw), true) ?? [];
-        $userId = $stateData['user_id'] ?? Auth::id() ?? 1;
-        $orgId = $stateData['organization_id'] ?? Auth::user()?->organization_id ?? 1;
+            $userInfo = $userInfoRes->json();
+            $email = $userInfo['email'] ?? null;
+            $name = $userInfo['name'] ?? $userInfo['given_name'] ?? 'Google Sender';
 
-        DB::transaction(function () use ($orgId, $userId, $email, $name, $clientId, $clientSecret, $accessToken, $refreshToken, $expiresIn) {
-            $sender = EmailSender::updateOrCreate(
-                [
-                    'organization_id' => $orgId,
-                    'email' => $email,
-                    'provider' => 'gmail',
-                ],
-                [
-                    'name' => $name . ' (Gmail)',
-                    'display_name' => $name,
-                    'daily_limit' => 500,
-                    'hourly_limit' => 50,
-                    'is_active' => true,
-                    'created_by' => $userId,
-                ]
-            );
+            if (empty($email)) {
+                return redirect($redirectTabUrl . '&oauth_error=Google+profile+did+not+provide+email');
+            }
 
-            EmailSenderAccount::updateOrCreate(
-                [
-                    'email_sender_id' => $sender->id,
-                ],
-                [
-                    'settings' => [
-                        'client_id' => $clientId,
-                        'client_secret' => $clientSecret,
-                        'access_token' => $accessToken,
-                        'refresh_token' => $refreshToken,
-                        'token_expires_at' => now()->addSeconds($expiresIn)->timestamp,
+            // Decode state if present
+            $stateRaw = $request->query('state');
+            $stateData = json_decode(base64_decode($stateRaw), true) ?? [];
+            $userId = $stateData['user_id'] ?? Auth::id() ?? 1;
+            $orgId = $stateData['organization_id'] ?? Auth::user()?->organization_id ?? 1;
+
+            DB::transaction(function () use ($orgId, $userId, $email, $name, $clientId, $clientSecret, $accessToken, $refreshToken, $expiresIn) {
+                $sender = EmailSender::updateOrCreate(
+                    [
+                        'organization_id' => $orgId,
+                        'email' => $email,
+                        'provider' => 'gmail',
                     ],
-                ]
-            );
-        });
+                    [
+                        'name' => $name . ' (Gmail)',
+                        'display_name' => $name,
+                        'daily_limit' => 500,
+                        'hourly_limit' => 50,
+                        'is_active' => true,
+                        'created_by' => $userId,
+                    ]
+                );
 
-        return redirect($frontendUrl . '/email-campaigns?oauth_success=Google+account+connected+successfully&email=' . urlencode($email));
+                EmailSenderAccount::updateOrCreate(
+                    [
+                        'email_sender_id' => $sender->id,
+                    ],
+                    [
+                        'settings' => [
+                            'client_id' => $clientId,
+                            'client_secret' => $clientSecret,
+                            'access_token' => $accessToken,
+                            'refresh_token' => $refreshToken,
+                            'token_expires_at' => now()->addSeconds($expiresIn)->timestamp,
+                        ],
+                    ]
+                );
+            });
+
+            return redirect($redirectTabUrl . '&oauth_success=' . urlencode("Google account ({$email}) connected successfully!"));
+        } catch (\Throwable $e) {
+            return redirect($redirectTabUrl . '&oauth_error=' . urlencode($e->getMessage()));
+        }
     }
 }
