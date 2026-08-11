@@ -18,8 +18,8 @@ class OAuthController extends Controller
      */
     public function googleRedirect(Request $request)
     {
-        $clientId = config('services.google.client_id');
-        $redirectUri = config('services.google.redirect_uri');
+        $clientId = config('services.google.client_id') ?: env('GOOGLE_CLIENT_ID');
+        $redirectUri = config('services.google.redirect_uri') ?: env('GOOGLE_REDIRECT_URI', 'https://api-crm.wpthrust.in/api/oauth/google/callback');
 
         if (empty($clientId)) {
             return response()->json([
@@ -72,15 +72,15 @@ class OAuthController extends Controller
     {
         $code = $request->query('code');
         $error = $request->query('error');
-        $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+        $frontendUrl = env('FRONTEND_URL', 'https://crm.wpthrust.in');
 
         if ($error || empty($code)) {
             return redirect($frontendUrl . '/email-campaigns?oauth_error=' . urlencode($error ?? 'Authorization code missing'));
         }
 
-        $clientId = config('services.google.client_id');
-        $clientSecret = config('services.google.client_secret');
-        $redirectUri = config('services.google.redirect_uri');
+        $clientId = config('services.google.client_id') ?: env('GOOGLE_CLIENT_ID');
+        $clientSecret = config('services.google.client_secret') ?: env('GOOGLE_CLIENT_SECRET');
+        $redirectUri = config('services.google.redirect_uri') ?: env('GOOGLE_REDIRECT_URI', 'https://api-crm.wpthrust.in/api/oauth/google/callback');
 
         // Exchange authorization code for access & refresh tokens
         $tokenResponse = Http::asForm()->post('https://oauth2.googleapis.com/token', [
