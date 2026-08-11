@@ -86,6 +86,16 @@ class CampaignLead extends Model
 
     ];
 
+    protected $attributes = [
+
+        'status' => 'pending',
+
+        'retry_count' => 0,
+
+        'max_retry' => 3,
+
+    ];
+
     protected $casts = [
 
         'scheduled_at' => 'datetime',
@@ -151,5 +161,100 @@ class CampaignLead extends Model
             EmailTemplateVersion::class,
             'email_template_version_id'
         );
+    }
+
+    /**
+     * Delivery Attempts
+     */
+    public function deliveryAttempts()
+    {
+        return $this->hasMany(
+            CampaignDeliveryAttempt::class,
+            'campaign_lead_id'
+        );
+    }
+
+    /**
+     * Latest Delivery Attempt
+     */
+    public function latestAttempt()
+    {
+        return $this->hasOne(
+            CampaignDeliveryAttempt::class,
+            'campaign_lead_id'
+        )->latestOfMany();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scopes
+    |--------------------------------------------------------------------------
+    */
+
+    public function scopePending($query)
+    {
+        return $query->where('status', 'pending');
+    }
+
+    public function scopeProcessing($query)
+    {
+        return $query->where('status', 'processing');
+    }
+
+    public function scopeSent($query)
+    {
+        return $query->where('status', 'sent');
+    }
+
+    public function scopeFailed($query)
+    {
+        return $query->where('status', 'failed');
+    }
+
+    public function scopeDue($query, $timestamp = null)
+    {
+        $time = $timestamp ?? now();
+        return $query->where('status', 'pending')
+            ->where(function ($q) use ($time) {
+                $q->whereNull('scheduled_at')
+                  ->orWhere('scheduled_at', '<=', $time);
+            });
+    }
+
+    public function scopeStaleProcessing($query, int $timeoutMinutes = 10)
+    {
+        return $query->where('status', 'processing')
+            ->where('processing_started_at', '<=', now()->subMinutes($timeoutMinutes));
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Helpers
+    |--------------------------------------------------------------------------
+    */
+
+    public function isPending(): bool
+    {
+        return $this->status === 'pending';
+    }
+
+    public function isProcessing(): bool
+    {
+        return $this->status === 'processing';
+    }
+
+    public function isSent(): bool
+    {
+        return $this->status === 'sent';
+    }
+
+    public function isFailed(): bool
+    {
+        return $this->status === 'failed';
+    }
+
+    public function canRetry(): bool
+    {
+        return $this->status === 'failed' && $this->retry_count < $this->max_retry;
     }
 }

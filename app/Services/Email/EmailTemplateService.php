@@ -18,6 +18,8 @@ class EmailTemplateService
 
             $template = EmailTemplate::create([
 
+                'organization_id' => Auth::user()?->organization_id ?? $data['organization_id'] ?? 1,
+
                 'name' => $data['name'],
 
                 'template_type' => $data['template_type'],

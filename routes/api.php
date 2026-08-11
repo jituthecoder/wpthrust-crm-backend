@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\EmailSenderController;
 use App\Http\Controllers\Api\EmailTemplateController;
 use App\Http\Controllers\Api\TemplateVariableController;
 use App\Http\Controllers\Api\EmailCampaignController;
+use App\Http\Controllers\Api\OAuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -20,6 +21,10 @@ use App\Http\Controllers\Api\EmailCampaignController;
 */
 
 Route::post('/login', [AuthController::class, 'login']);
+
+// OAuth Routes
+Route::get('/oauth/google/redirect', [OAuthController::class, 'googleRedirect']);
+Route::get('/oauth/google/callback', [OAuthController::class, 'googleCallback']);
 
 /*
 |--------------------------------------------------------------------------
@@ -99,6 +104,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/users/{user}', [UserController::class, 'destroy']);
 
         Route::get('/users/sales-executives', [UserController::class, 'salesExecutives']);
+        
+        Route::put(
+            '/users/{user}/password',
+            [UserController::class, 'updatePassword']
+        );
 
 
         /*
@@ -198,6 +208,11 @@ Route::middleware('auth:sanctum')->group(function () {
         );
 
         Route::post(
+            'email-campaigns/{emailCampaign}/cancel',
+            [EmailCampaignController::class, 'cancel']
+        );
+
+        Route::post(
             'email-campaigns/{emailCampaign}/leads',
             [EmailCampaignController::class, 'assignLeads']
         );
@@ -216,7 +231,7 @@ Route::middleware('auth:sanctum')->group(function () {
             'email-campaigns/{emailCampaign}/leads/retry-all',
             [EmailCampaignController::class, 'retryAllFailedLeads']
         );
-        
+
         Route::post(
             'email-campaigns/{emailCampaign}/leads/{campaignLead}/retry',
             [EmailCampaignController::class, 'retryLead']

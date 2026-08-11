@@ -56,6 +56,8 @@ class EmailCampaignService
 
             $campaign = EmailCampaign::create([
 
+                'organization_id' => Auth::user()?->organization_id ?? $data['organization_id'] ?? 1,
+
                 'name' => $data['name'],
 
                 'description' => $data['description'] ?? null,
@@ -626,69 +628,104 @@ class EmailCampaignService
 
 
     /**
+     * Cancel Campaign
+     */
+    public function cancel(
+        EmailCampaign $campaign
+    ): EmailCampaign {
+        return DB::transaction(function () use ($campaign) {
+            $locked = EmailCampaign::where('id', $campaign->id)->lockForUpdate()->first();
+
+            if (in_array($locked->status, ['completed', 'cancelled'], true)) {
+                throw new \Exception(
+                    "Cannot cancel a campaign with status '{$locked->status}'."
+                );
+            }
+
+            $locked->update([
+                'status' => 'cancelled',
+            ]);
+
+            return $locked->fresh()->load([
+                'template',
+                'creator',
+                'senders.sender',
+                'leads.business',
+            ]);
+        });
+    }
+
+    /**
      * Mark Campaign Completed If All Leads Are Processed
      */
     public function completeIfFinished(
         EmailCampaign $campaign
     ): bool {
+        return DB::transaction(function () use ($campaign) {
+            $lockedCampaign = EmailCampaign::where('id', $campaign->id)
+                ->lockForUpdate()
+                ->first();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Do Not Process Already Completed Campaign
-        |--------------------------------------------------------------------------
-        */
+            if (!$lockedCampaign) {
+                return false;
+            }
 
-        if ($campaign->status === 'completed') {
+            if ($lockedCampaign->status === 'completed') {
+                return true;
+            }
+
+            if ($lockedCampaign->status === 'cancelled') {
+                return false;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Count Remaining Leads
+            |--------------------------------------------------------------------------
+            */
+
+            $pending = $lockedCampaign->leads()
+                ->where('status', 'pending')
+                ->count();
+
+            $processing = $lockedCampaign->leads()
+                ->where('status', 'processing')
+                ->count();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Campaign Still Has Work
+            |--------------------------------------------------------------------------
+            */
+
+            if ($pending > 0 || $processing > 0) {
+                return false;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Make Sure Campaign Actually Has Leads
+            |--------------------------------------------------------------------------
+            */
+
+            $total = $lockedCampaign->leads()->count();
+
+            if ($total === 0) {
+                return false;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Mark Campaign Completed
+            |--------------------------------------------------------------------------
+            */
+
+            $lockedCampaign->update([
+                'status' => 'completed',
+            ]);
+
             return true;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Count Remaining Leads
-        |--------------------------------------------------------------------------
-        */
-
-        $pending = $campaign->leads()
-            ->where('status', 'pending')
-            ->count();
-
-        $processing = $campaign->leads()
-            ->where('status', 'processing')
-            ->count();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Campaign Still Has Work
-        |--------------------------------------------------------------------------
-        */
-
-        if ($pending > 0 || $processing > 0) {
-            return false;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Make Sure Campaign Actually Has Leads
-        |--------------------------------------------------------------------------
-        */
-
-        $total = $campaign->leads()->count();
-
-        if ($total === 0) {
-            return false;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Mark Campaign Completed
-        |--------------------------------------------------------------------------
-        */
-
-        $campaign->update([
-            'status' => 'completed',
-        ]);
-
-        return true;
+        });
     }
 
 
@@ -757,124 +794,112 @@ class EmailCampaignService
      * Retry All Failed Campaign Leads
      */
     public function retryAllFailedLeads(
-    EmailCampaign $campaign
+        EmailCampaign $campaign
     ): array {
 
-    return DB::transaction(function () use ($campaign) {
+        return DB::transaction(function () use ($campaign) {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Get Failed Leads Eligible For Retry
-        |--------------------------------------------------------------------------
-        */
+            /*
+            |--------------------------------------------------------------------------
+            | Get Failed Leads Eligible For Retry
+            |--------------------------------------------------------------------------
+            */
 
-        $leads = CampaignLead::where(
-            'email_campaign_id',
-            $campaign->id
-        )
-            ->where('status', 'failed')
-            ->whereColumn('retry_count', '<', 'max_retry')
-            ->get();
+            $leads = CampaignLead::where(
+                'email_campaign_id',
+                $campaign->id
+            )
+                ->where('status', 'failed')
+                ->whereColumn('retry_count', '<', 'max_retry')
+                ->get();
 
-        /*
-        |--------------------------------------------------------------------------
-        | No Leads Available
-        |--------------------------------------------------------------------------
-        */
+            /*
+            |--------------------------------------------------------------------------
+            | No Leads Available
+            |--------------------------------------------------------------------------
+            */
 
-        if ($leads->isEmpty()) {
+            if ($leads->isEmpty()) {
+
+                return [
+                    'queued' => 0,
+                    'skipped' => CampaignLead::where(
+                        'email_campaign_id',
+                        $campaign->id
+                    )
+                        ->where('status', 'failed')
+                        ->count(),
+                ];
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Restore Campaign To Running State If Needed
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $campaign->status === 'completed' ||
+                $campaign->status === 'paused' ||
+                $campaign->status === 'draft'
+            ) {
+
+                $campaign->update([
+                    'status' => 'running',
+                ]);
+
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Reset Failed Leads to Pending for Scheduler Processing
+            |--------------------------------------------------------------------------
+            */
+
+            foreach ($leads as $lead) {
+
+                $lead->update([
+
+                    'status' => 'pending',
+
+                    'failure_reason' => null,
+
+                    'processing_started_at' => null,
+
+                    'last_attempt_at' => null,
+
+                    'scheduled_at' => now(),
+
+                    'sent_at' => null,
+
+                    'provider_message_id' => null,
+
+                    'provider_thread_id' => null,
+
+                ]);
+
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Return Statistics (Leads set to pending, picked up by Scheduler)
+            |--------------------------------------------------------------------------
+            */
 
             return [
-                'queued' => 0,
+
+                'queued' => $leads->count(),
+
                 'skipped' => CampaignLead::where(
                     'email_campaign_id',
                     $campaign->id
                 )
                     ->where('status', 'failed')
                     ->count(),
+
             ];
-        }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Make Campaign Running
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            $campaign->status === 'completed' ||
-            $campaign->status === 'paused' ||
-            $campaign->status === 'draft'
-        ) {
-
-            $campaign->update([
-                'status' => 'running',
-            ]);
-
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Reset Failed Leads
-        |--------------------------------------------------------------------------
-        */
-
-        foreach ($leads as $lead) {
-
-            $lead->update([
-
-                'status' => 'pending',
-
-                'failure_reason' => null,
-
-                'processing_started_at' => null,
-
-                'last_attempt_at' => null,
-
-                'sent_at' => null,
-
-                'provider_message_id' => null,
-
-                'provider_thread_id' => null,
-
-            ]);
-
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Dispatch Jobs After Transaction
-        |--------------------------------------------------------------------------
-        */
-
-        foreach ($leads as $lead) {
-
-            SendCampaignLeadJob::dispatch(
-                $lead->id
-            )->afterCommit();
-
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Return Statistics
-        |--------------------------------------------------------------------------
-        */
-
-        return [
-
-            'queued' => $leads->count(),
-
-            'skipped' => CampaignLead::where(
-                'email_campaign_id',
-                $campaign->id
-            )
-                ->where('status', 'failed')
-                ->count(),
-
-        ];
-
-    });
+        });
     }
 
     /**

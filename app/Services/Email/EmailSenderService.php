@@ -7,6 +7,8 @@ use App\Models\EmailSenderAccount;
 use Illuminate\Support\Facades\DB;
 use App\Mail\TestEmail;
 
+use App\Services\Email\Providers\ProviderDeliveryResult;
+
 class EmailSenderService
 {
     /**
@@ -23,6 +25,8 @@ class EmailSenderService
             */
 
             $sender = EmailSender::create([
+
+                'organization_id' => auth()->user()?->organization_id ?? $data['organization_id'] ?? 1,
 
                 'name' => $data['name'],
 
@@ -130,12 +134,13 @@ class EmailSenderService
     public function sendTestEmail(
         EmailSender $sender,
         array $payload
-    ): bool
+    ): ProviderDeliveryResult
     {
         $provider = ProviderFactory::make($sender);
 
         $mailable = (new TestEmail(
-            $payload['message']
+            $payload['message'],
+            $payload['subject'] ?? null
         ))
             ->to($payload['to'])
             ->from(

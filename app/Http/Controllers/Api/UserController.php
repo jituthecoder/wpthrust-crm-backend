@@ -165,6 +165,26 @@ class UserController extends Controller
         ]);
     }
 
+
+    /**
+     * Update User Password
+     */
+    public function updatePassword(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+
+        $user->update([
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'User password updated successfully.',
+        ]);
+    }
+
     /**
      * Delete User
      */

@@ -6,6 +6,7 @@ use App\Mail\CampaignEmail;
 use App\Models\CampaignLead;
 use App\Models\EmailSender;
 use App\Services\Email\ProviderFactory;
+use App\Services\Email\Providers\ProviderDeliveryResult;
 
 class CampaignMailerService
 {
@@ -18,7 +19,7 @@ class CampaignMailerService
         string $subject,
         string $html,
         ?string $plainText = null
-    ): bool {
+    ): ProviderDeliveryResult {
 
         /*
         |--------------------------------------------------------------------------
@@ -68,11 +69,11 @@ class CampaignMailerService
         |--------------------------------------------------------------------------
         */
 
-        $provider->send(
-            $sender->senderAccount->settings,
+        $settings = $sender->senderAccount?->settings ?? [];
+
+        return $provider->send(
+            $settings,
             $mailable
         );
-
-        return true;
     }
 }

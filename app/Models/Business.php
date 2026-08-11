@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Business extends Model
 {
     protected $fillable = [
+        'organization_id',
         'business_name',
         'category',
         'phone',
@@ -41,6 +42,11 @@ class Business extends Model
             'last_called_at' => 'datetime',
             'next_followup_at' => 'datetime',
         ];
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     public function assignedUser(): BelongsTo

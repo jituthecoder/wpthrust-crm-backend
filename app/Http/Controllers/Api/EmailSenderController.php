@@ -226,16 +226,27 @@ class EmailSenderController extends Controller
 
         ]);
 
-        $this->service->sendTestEmail(
+        $result = $this->service->sendTestEmail(
             $emailSender,
             $validated
         );
+
+        if (!$result->isSuccess()) {
+            return response()->json([
+                'success' => false,
+                'message' => $result->getErrorMessage() ?? 'Failed to send test email.',
+            ], 422);
+        }
 
         return response()->json([
 
             'success' => true,
 
             'message' => 'Test email sent successfully.',
+
+            'data' => [
+                'provider_message_id' => $result->getProviderMessageId(),
+            ]
 
         ]);
     }

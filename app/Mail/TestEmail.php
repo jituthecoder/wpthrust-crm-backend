@@ -2,30 +2,27 @@
 
 namespace App\Mail;
 
+use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Queue\SerializesModels;
 
 class TestEmail extends Mailable
 {
-    public string $messageBody;
+    use Queueable, SerializesModels;
 
-    public function __construct(string $messageBody)
+    public string $messageBody;
+    public ?string $customSubject;
+
+    public function __construct(string $messageBody, ?string $customSubject = null)
     {
         $this->messageBody = $messageBody;
+        $this->customSubject = $customSubject;
     }
 
-    public function envelope(): Envelope
+    public function build()
     {
-        return new Envelope(
-            subject: 'WPThrust CRM - Test Email',
-        );
-    }
-
-    public function content(): Content
-    {
-        return new Content(
-            view: 'emails.test-email',
-        );
+        return $this
+            ->subject($this->customSubject ?? 'WPThrust CRM - Test Email')
+            ->view('emails.test-email');
     }
 }

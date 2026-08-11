@@ -21,7 +21,7 @@ interface EmailProviderInterface
     public function send(
         array $settings,
         Mailable $mailable
-    ): bool;
+    ): ProviderDeliveryResult;
 
     /**
      * Sync Inbox

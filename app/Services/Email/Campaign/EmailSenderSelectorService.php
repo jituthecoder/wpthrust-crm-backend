@@ -4,6 +4,7 @@ namespace App\Services\Email\Campaign;
 
 use App\Models\CampaignLead;
 use App\Models\CampaignSender;
+use App\Services\Email\Campaign\SenderCapacityService;
 
 class EmailSenderSelectorService
 {
@@ -34,11 +35,13 @@ class EmailSenderSelectorService
 
         /*
         |--------------------------------------------------------------------------
-        | Filter Senders By Limits
+        | Filter Senders By Capacity Engine
         |--------------------------------------------------------------------------
         */
 
-        $availableSenders = $senders->filter(function ($campaignSender) {
+        $capacityService = app(SenderCapacityService::class);
+
+        $availableSenders = $senders->filter(function ($campaignSender) use ($capacityService) {
 
             $sender = $campaignSender->sender;
 
@@ -46,33 +49,7 @@ class EmailSenderSelectorService
                 return false;
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Daily Limit
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                $sender->daily_limit &&
-                $sender->sent_today >= $sender->daily_limit
-            ) {
-                return false;
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Hourly Limit
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                $sender->hourly_limit &&
-                $sender->sent_this_hour >= $sender->hourly_limit
-            ) {
-                return false;
-            }
-
-            return true;
+            return $capacityService->canReserve($sender);
 
         })->values();
 

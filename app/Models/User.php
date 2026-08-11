@@ -14,6 +14,7 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
+        'organization_id',
         'name',
         'email',
         'password',
@@ -44,5 +45,10 @@ class User extends Authenticatable
     public function leadActivities()
     {
         return $this->hasMany(LeadActivity::class);
+    }
+
+    public function organization()
+    {
+        return $this->belongsTo(Organization::class);
     }
 }

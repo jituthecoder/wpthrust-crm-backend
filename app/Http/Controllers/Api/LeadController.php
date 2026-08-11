@@ -144,9 +144,14 @@ class LeadController extends Controller
 
         }
 
+        $perPage = (int) $request->get('per_page', 20);
+        if ($perPage < 1) {
+            $perPage = 20;
+        }
+
         $leads = $query
             ->latest()
-            ->paginate(20);
+            ->paginate($perPage);
 
         return response()->json([
             'success' => true,

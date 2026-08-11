@@ -36,6 +36,16 @@ class EmailSender extends Model
 
         'sent_this_hour',
 
+        'reserved_today',
+
+        'reserved_this_hour',
+
+        'last_daily_reset_at',
+
+        'last_hourly_reset_at',
+
+        'last_reserved_at',
+
         /*
         |--------------------------------------------------------------------------
         | Misc
@@ -52,6 +62,8 @@ class EmailSender extends Model
 
         'created_by',
 
+        'organization_id',
+
     ];
 
     protected $casts = [
@@ -62,6 +74,12 @@ class EmailSender extends Model
 
         'last_sync_at' => 'datetime',
 
+        'last_daily_reset_at' => 'datetime',
+
+        'last_hourly_reset_at' => 'datetime',
+
+        'last_reserved_at' => 'datetime',
+
     ];
 
     /*
@@ -69,6 +87,13 @@ class EmailSender extends Model
     | Relationships
     |--------------------------------------------------------------------------
     */
+
+    public function organization()
+    {
+        return $this->belongsTo(
+            Organization::class
+        );
+    }
 
     public function senderAccount()
     {

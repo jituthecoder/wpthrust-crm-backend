@@ -27,14 +27,33 @@ class EmailCampaignController extends Controller
     }
 
     /**
+     * Tenant Authorization Guard
+     */
+    protected function authorizeTenant(EmailCampaign $campaign): void
+    {
+        $user = auth()->user();
+        if ($user && $campaign->organization_id !== null && $campaign->organization_id !== $user->organization_id) {
+            abort(403, 'Unauthorized tenant access to campaign.');
+        }
+    }
+
+    /**
      * Campaign List
      */
     public function index(Request $request)
     {
-        $query = EmailCampaign::with([
-            'template',
-            'creator',
-        ]);
+        $orgId = $request->user()->organization_id;
+
+        $query = EmailCampaign::where(function ($q) use ($orgId) {
+            $q->where('organization_id', $orgId);
+            if ($orgId == 1) {
+                $q->orWhereNull('organization_id');
+            }
+        })
+            ->with([
+                'template',
+                'creator',
+            ]);
 
         /*
         |--------------------------------------------------------------------------
@@ -108,6 +127,7 @@ class EmailCampaignController extends Controller
     public function start(
         EmailCampaign $emailCampaign
     ) {
+        $this->authorizeTenant($emailCampaign);
 
         $campaign = $this->campaignStarter->start(
             $emailCampaign
@@ -130,6 +150,7 @@ class EmailCampaignController extends Controller
     public function pause(
         EmailCampaign $emailCampaign
     ) {
+        $this->authorizeTenant($emailCampaign);
 
         $campaign = $this->service->pause(
             $emailCampaign
@@ -152,6 +173,7 @@ class EmailCampaignController extends Controller
     public function resume(
         EmailCampaign $emailCampaign
     ) {
+        $this->authorizeTenant($emailCampaign);
 
         $campaign = $this->service->resume(
             $emailCampaign
@@ -169,12 +191,36 @@ class EmailCampaignController extends Controller
     }
 
     /**
+     * Cancel Campaign
+     */
+    public function cancel(
+        EmailCampaign $emailCampaign
+    ) {
+        $this->authorizeTenant($emailCampaign);
+
+        $campaign = $this->service->cancel(
+            $emailCampaign
+        );
+
+        return response()->json([
+
+            'success' => true,
+
+            'message' => 'Campaign cancelled successfully.',
+
+            'data' => $campaign,
+
+        ]);
+    }
+
+    /**
      * Assign Businesses to Campaign
      */
     public function assignLeads(
         AssignCampaignLeadsRequest $request,
         EmailCampaign $emailCampaign
     ) {
+        $this->authorizeTenant($emailCampaign);
 
         $campaign = $this->service->assignLeads(
             $emailCampaign,
@@ -198,6 +244,7 @@ class EmailCampaignController extends Controller
     public function show(
         EmailCampaign $emailCampaign
     ) {
+        $this->authorizeTenant($emailCampaign);
 
         return response()->json([
 
@@ -224,6 +271,7 @@ class EmailCampaignController extends Controller
     public function stats(
         EmailCampaign $emailCampaign
     ) {
+        $this->authorizeTenant($emailCampaign);
 
         $stats = $this->service->stats(
             $emailCampaign
@@ -245,6 +293,8 @@ class EmailCampaignController extends Controller
         Request $request,
         EmailCampaign $emailCampaign
     ) {
+        $this->authorizeTenant($emailCampaign);
+
         $filters = $request->validate([
 
             'status' => [
@@ -288,6 +338,11 @@ class EmailCampaignController extends Controller
         EmailCampaign $emailCampaign,
         CampaignLead $campaignLead
     ) {
+        $this->authorizeTenant($emailCampaign);
+
+        if ($campaignLead->email_campaign_id !== $emailCampaign->id) {
+            abort(404, 'Campaign lead does not belong to specified campaign.');
+        }
 
         $lead = $this->service->retryLead(
             $emailCampaign,
@@ -311,6 +366,7 @@ class EmailCampaignController extends Controller
     public function retryAllFailedLeads(
         EmailCampaign $emailCampaign
     ) {
+        $this->authorizeTenant($emailCampaign);
 
         $result = $this->service->retryAllFailedLeads(
             $emailCampaign
@@ -344,6 +400,7 @@ class EmailCampaignController extends Controller
         EmailCampaignRequest $request,
         EmailCampaign $emailCampaign
     ) {
+        $this->authorizeTenant($emailCampaign);
 
         $campaign = $this->service->update(
 
@@ -370,6 +427,7 @@ class EmailCampaignController extends Controller
     public function destroy(
         EmailCampaign $emailCampaign
     ) {
+        $this->authorizeTenant($emailCampaign);
 
         $this->service->delete(
             $emailCampaign

@@ -44,6 +44,8 @@ class EmailTemplate extends Model
 
         'created_by',
 
+        'organization_id',
+
     ];
 
     protected $casts = [];
@@ -53,6 +55,16 @@ class EmailTemplate extends Model
     | Relationships
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * Organization
+     */
+    public function organization()
+    {
+        return $this->belongsTo(
+            Organization::class
+        );
+    }
 
     /**
      * All versions

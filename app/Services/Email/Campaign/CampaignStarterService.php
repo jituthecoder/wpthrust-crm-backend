@@ -51,7 +51,7 @@ class CampaignStarterService
             |--------------------------------------------------------------------------
             */
 
-            $this->queuePendingLeads($campaign);
+            $this->schedulePendingLeads($campaign);
 
             /*
             |--------------------------------------------------------------------------
@@ -86,49 +86,27 @@ class CampaignStarterService
             |--------------------------------------------------------------------------
             | Update Campaign Status
             |--------------------------------------------------------------------------
+            |
+            | Resuming campaign allows the delivery scheduler to resume picking up
+            | due pending leads without re-dispatching duplicate jobs.
+            |
             */
 
             $campaign->update([
                 'status' => 'running',
             ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Queue Pending Leads
-            |--------------------------------------------------------------------------
-            */
-
-            $this->queuePendingLeads($campaign);
-
-            /*
-            |--------------------------------------------------------------------------
-            | Return Campaign
-            |--------------------------------------------------------------------------
-            */
-
             return $campaign->fresh();
         });
     }
 
     /**
-     * Queue Pending Campaign Leads
+     * Schedule Pending Campaign Leads with Rate Distribution and Jitter Pacing
      */
-    protected function queuePendingLeads(
+    protected function schedulePendingLeads(
         EmailCampaign $campaign
     ): void {
-
-        $campaign->leads()
-            ->where('status', 'pending')
-            ->chunkById(100, function ($leads) {
-
-                foreach ($leads as $lead) {
-
-                    SendCampaignLeadJob::dispatch(
-                        $lead->id
-                    )->afterCommit();
-
-                }
-
-            });
+        $rateDistributionService = app(RateDistributionService::class);
+        $rateDistributionService->distributeCampaignLeads($campaign);
     }
 }
