@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\EmailSender;
 use App\Models\EmailSenderAccount;
+use App\Models\User;
+use App\Models\Organization;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -28,8 +30,16 @@ class OAuthController extends Controller
             ], 422);
         }
 
-        $userId = Auth::id() ?? $request->query('user_id', 1);
-        $orgId = Auth::user()?->organization_id ?? $request->query('organization_id', 1);
+        $userId = Auth::id() ?? $request->query('user_id');
+        if (!$userId || !User::where('id', $userId)->exists()) {
+            $userId = User::first()?->id;
+        }
+
+        $userObj = $userId ? User::find($userId) : null;
+        $orgId = Auth::user()?->organization_id ?? $request->query('organization_id') ?? $userObj?->organization_id;
+        if (!$orgId || !Organization::where('id', $orgId)->exists()) {
+            $orgId = Organization::first()?->id ?? 1;
+        }
 
         $stateData = base64_encode(json_encode([
             'user_id' => $userId,
@@ -125,24 +135,39 @@ class OAuthController extends Controller
             // Decode state if present
             $stateRaw = $request->query('state');
             $stateData = json_decode(base64_decode($stateRaw), true) ?? [];
-            $userId = $stateData['user_id'] ?? Auth::id() ?? 1;
-            $orgId = $stateData['organization_id'] ?? Auth::user()?->organization_id ?? 1;
+            
+            $userId = $stateData['user_id'] ?? Auth::id();
+            if (!$userId || !User::where('id', $userId)->exists()) {
+                $firstUser = User::first();
+                $userId = $firstUser?->id;
+            }
+
+            $userObj = $userId ? User::find($userId) : null;
+            $orgId = $stateData['organization_id'] ?? Auth::user()?->organization_id ?? $userObj?->organization_id;
+            if (!$orgId || !Organization::where('id', $orgId)->exists()) {
+                $firstOrg = Organization::first();
+                $orgId = $firstOrg?->id ?? 1;
+            }
 
             DB::transaction(function () use ($orgId, $userId, $email, $name, $clientId, $clientSecret, $accessToken, $refreshToken, $expiresIn) {
+                $senderData = [
+                    'name' => $name . ' (Gmail)',
+                    'display_name' => $name,
+                    'daily_limit' => 500,
+                    'hourly_limit' => 50,
+                    'is_active' => true,
+                ];
+                if ($userId) {
+                    $senderData['created_by'] = $userId;
+                }
+
                 $sender = EmailSender::updateOrCreate(
                     [
                         'organization_id' => $orgId,
                         'email' => $email,
                         'provider' => 'gmail',
                     ],
-                    [
-                        'name' => $name . ' (Gmail)',
-                        'display_name' => $name,
-                        'daily_limit' => 500,
-                        'hourly_limit' => 50,
-                        'is_active' => true,
-                        'created_by' => $userId,
-                    ]
+                    $senderData
                 );
 
                 EmailSenderAccount::updateOrCreate(
