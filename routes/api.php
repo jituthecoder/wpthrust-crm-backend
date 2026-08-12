@@ -85,6 +85,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/businesses/{business}', [BusinessController::class, 'show']);
 
+        Route::post('/businesses/{business}/fetch-psi', [BusinessController::class, 'fetchPsi']);
+
         Route::post('/businesses/import', [BusinessImportController::class, 'import']);
 
         Route::post('/businesses/assign', [LeadController::class, 'assign']);

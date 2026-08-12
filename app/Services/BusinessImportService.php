@@ -59,6 +59,10 @@ class BusinessImportService
 
                 DB::commit();
 
+                if (!empty($business->website)) {
+                    \App\Jobs\FetchBusinessPsiJob::dispatch($business);
+                }
+
                 $this->imported++;
 
             } catch (\Exception $e) {

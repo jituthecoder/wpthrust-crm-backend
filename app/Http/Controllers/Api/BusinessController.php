@@ -160,4 +160,21 @@ class BusinessController extends Controller
             'data' => $business,
         ]);
     }
+
+    public function fetchPsi(Business $business)
+    {
+        if (empty($business->website)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This business does not have a website URL.',
+            ], 422);
+        }
+
+        \App\Jobs\FetchBusinessPsiJob::dispatch($business);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'PageSpeed Insights background audit dispatched successfully.',
+        ]);
+    }
 }

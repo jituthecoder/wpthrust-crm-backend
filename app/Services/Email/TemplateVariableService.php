@@ -146,6 +146,48 @@ class TemplateVariableService
 
             [
                 'group' => 'Performance',
+                'key' => 'mobile_fcp',
+                'variable' => '{{mobile_fcp}}',
+                'label' => 'Mobile FCP',
+            ],
+
+            [
+                'group' => 'Performance',
+                'key' => 'mobile_tbt',
+                'variable' => '{{mobile_tbt}}',
+                'label' => 'Mobile TBT',
+            ],
+
+            [
+                'group' => 'Performance',
+                'key' => 'mobile_cls',
+                'variable' => '{{mobile_cls}}',
+                'label' => 'Mobile CLS',
+            ],
+
+            [
+                'group' => 'Performance',
+                'key' => 'mobile_speed_index',
+                'variable' => '{{mobile_speed_index}}',
+                'label' => 'Mobile Speed Index',
+            ],
+
+            [
+                'group' => 'Performance',
+                'key' => 'mobile_screenshot',
+                'variable' => '{{mobile_screenshot}}',
+                'label' => 'Mobile Screenshot (HTML Image)',
+            ],
+
+            [
+                'group' => 'Performance',
+                'key' => 'mobile_screenshot_url',
+                'variable' => '{{mobile_screenshot_url}}',
+                'label' => 'Mobile Screenshot URL',
+            ],
+
+            [
+                'group' => 'Performance',
                 'key' => 'desktop_lcp',
                 'variable' => '{{desktop_lcp}}',
                 'label' => 'Desktop LCP',
@@ -217,6 +259,7 @@ class TemplateVariableService
     ): string
     {
         $audit = $business->audit;
+        $screenshotUrl = optional($audit)->mobile_screenshot_url;
 
         $replace = [
 
@@ -257,6 +300,20 @@ class TemplateVariableService
             '{{desktop_load_time}}' => optional($audit)->desktop_load_time,
 
             '{{mobile_lcp}}' => optional($audit)->mobile_lcp,
+
+            '{{mobile_fcp}}' => optional($audit)->mobile_fcp,
+
+            '{{mobile_tbt}}' => optional($audit)->mobile_tbt,
+
+            '{{mobile_cls}}' => optional($audit)->mobile_cls,
+
+            '{{mobile_speed_index}}' => optional($audit)->mobile_speed_index,
+
+            '{{mobile_screenshot_url}}' => $screenshotUrl ?? '',
+
+            '{{mobile_screenshot}}' => $screenshotUrl 
+                ? '<img src="' . htmlspecialchars($screenshotUrl) . '" alt="Website Mobile Screenshot" style="max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #e2e8f0;" />'
+                : '',
 
             '{{desktop_lcp}}' => optional($audit)->desktop_lcp,
 

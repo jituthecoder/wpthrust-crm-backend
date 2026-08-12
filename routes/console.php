@@ -10,3 +10,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('campaigns:recover')->everyMinute()->withoutOverlapping();
 Schedule::command('campaigns:process')->everyMinute()->withoutOverlapping();
+Schedule::command('psi:fetch --limit=20')->everyFiveMinutes()->withoutOverlapping();
