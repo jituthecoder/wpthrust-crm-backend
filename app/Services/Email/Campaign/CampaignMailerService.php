@@ -7,9 +7,14 @@ use App\Models\CampaignLead;
 use App\Models\EmailSender;
 use App\Services\Email\ProviderFactory;
 use App\Services\Email\Providers\ProviderDeliveryResult;
+use App\Services\Email\Tracking\EmailTrackingService;
 
 class CampaignMailerService
 {
+    public function __construct(
+        protected EmailTrackingService $trackingService = new EmailTrackingService()
+    ) {}
+
     /**
      * Send Campaign Email
      */
@@ -37,6 +42,14 @@ class CampaignMailerService
 
         /*
         |--------------------------------------------------------------------------
+        | Inject Open Pixel & Click Tracking Links
+        |--------------------------------------------------------------------------
+        */
+
+        $trackedHtml = $this->trackingService->prepareTrackedHtml($html, $lead);
+
+        /*
+        |--------------------------------------------------------------------------
         | Create Provider
         |--------------------------------------------------------------------------
         */
@@ -51,7 +64,7 @@ class CampaignMailerService
 
         $mailable = (new CampaignEmail(
             $subject,
-            $html,
+            $trackedHtml,
             $plainText
         ))
             ->to(

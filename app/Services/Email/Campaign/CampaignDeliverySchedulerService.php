@@ -67,7 +67,7 @@ class CampaignDeliverySchedulerService
                 'last_attempt_at' => now(),
             ]);
 
-            SendCampaignLeadJob::dispatch($lead->id)->afterCommit();
+            SendCampaignLeadJob::dispatch($lead->id)->onQueue('emails')->afterCommit();
 
             return true;
         });

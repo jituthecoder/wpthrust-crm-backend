@@ -82,6 +82,35 @@ class EmailCampaign extends Model
 
     ];
 
+    protected $appends = [
+        'open_rate',
+        'click_rate',
+    ];
+
+    /**
+     * Calculated Open Rate Percentage
+     */
+    public function getOpenRateAttribute(): float
+    {
+        $sent = (int) $this->sent_count;
+        if ($sent <= 0) {
+            return 0.0;
+        }
+        return round(($this->opened_count / $sent) * 100, 1);
+    }
+
+    /**
+     * Calculated Click Rate Percentage
+     */
+    public function getClickRateAttribute(): float
+    {
+        $sent = (int) $this->sent_count;
+        if ($sent <= 0) {
+            return 0.0;
+        }
+        return round(($this->clicked_count / $sent) * 100, 1);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Relationships

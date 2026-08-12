@@ -36,6 +36,7 @@ class SendCampaignLeadJob implements ShouldQueue
     public function __construct(int $campaignLeadId)
     {
         $this->campaignLeadId = $campaignLeadId;
+        $this->onQueue('emails');
     }
 
     /**

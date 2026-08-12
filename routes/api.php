@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\EmailTemplateController;
 use App\Http\Controllers\Api\TemplateVariableController;
 use App\Http\Controllers\Api\EmailCampaignController;
 use App\Http\Controllers\Api\OAuthController;
+use App\Http\Controllers\Api\EmailTrackingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -25,6 +26,10 @@ Route::post('/login', [AuthController::class, 'login']);
 // OAuth Routes
 Route::get('/oauth/google/redirect', [OAuthController::class, 'googleRedirect']);
 Route::get('/oauth/google/callback', [OAuthController::class, 'googleCallback']);
+
+// Email Open & Click Tracking Routes
+Route::get('/track/open/{campaignLead}', [EmailTrackingController::class, 'trackOpen']);
+Route::get('/track/click/{campaignLead}', [EmailTrackingController::class, 'trackClick']);
 
 /*
 |--------------------------------------------------------------------------
