@@ -91,18 +91,21 @@ class RateDistributionService
                     ];
                     $senderIndex++;
 
-                    // Calculate baseline position time
-                    $leadBaseTime = $baseScheduleTime->copy()->addSeconds((int) round($leadIndex * $baselineIntervalSeconds));
-                    $leadIndex++;
+                    if ($leadIndex === 0) {
+                        $jitteredScheduledAt = now();
+                    } else {
+                        // Calculate baseline position time
+                        $leadBaseTime = $baseScheduleTime->copy()->addSeconds((int) round($leadIndex * $baselineIntervalSeconds));
+                        // Apply random jitter to baseline time
+                        $jitteredScheduledAt = $this->applyJitter($leadBaseTime, $baselineIntervalSeconds, $effectiveJitterPercent);
 
-                    // Apply random jitter to baseline time
-                    $jitteredScheduledAt = $this->applyJitter($leadBaseTime, $baselineIntervalSeconds, $effectiveJitterPercent);
-
-                    // Enforce strict non-decreasing chronological order across sequential leads
-                    if ($jitteredScheduledAt->lessThan($lastScheduledAt)) {
-                        $jitteredScheduledAt = $lastScheduledAt->copy();
+                        // Enforce strict non-decreasing chronological order across sequential leads
+                        if ($jitteredScheduledAt->lessThan($lastScheduledAt)) {
+                            $jitteredScheduledAt = $lastScheduledAt->copy();
+                        }
                     }
                     $lastScheduledAt = $jitteredScheduledAt->copy();
+                    $leadIndex++;
 
                     $lead->update([
                         'email_sender_id' => $campaignSender->sender_id,
