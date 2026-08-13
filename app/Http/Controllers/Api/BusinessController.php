@@ -130,15 +130,19 @@ class BusinessController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if ($request->assigned === 'yes') {
-            $query->whereNotNull('assigned_user_id');
-        }
-
-        if ($request->assigned === 'no') {
-            $query->whereNull('assigned_user_id');
-        }
-
-        if ($request->filled('assigned_user_id')) {
+        if (
+            $request->assigned_user_id === 'unassigned' ||
+            $request->assigned === 'no' ||
+            $request->assigned === 'unassigned'
+        ) {
+            $query->where(function ($q) {
+                $q->whereNull('assigned_user_id')
+                  ->orWhere('assigned_user_id', 0)
+                  ->orWhere('assigned_user_id', '');
+            });
+        } elseif ($request->assigned === 'yes') {
+            $query->whereNotNull('assigned_user_id')->where('assigned_user_id', '!=', 0);
+        } elseif ($request->filled('assigned_user_id')) {
             $query->where('assigned_user_id', $request->assigned_user_id);
         }
 

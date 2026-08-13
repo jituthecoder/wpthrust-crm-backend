@@ -36,11 +36,9 @@ class LeadController extends Controller
         DB::beginTransaction();
 
         try {
-
             $businesses = Business::whereIn('id', $request->business_ids)->get();
 
             foreach ($businesses as $business) {
-
                 $oldUser = $business->assigned_user_id;
 
                 $business->update([
@@ -67,16 +65,13 @@ class LeadController extends Controller
                 'message' => count($businesses) . ' lead(s) assigned successfully.',
                 'assigned_count' => count($businesses),
             ]);
-
         } catch (\Throwable $e) {
-
             DB::rollBack();
 
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
             ], 500);
-
         }
     }
 
@@ -90,58 +85,47 @@ class LeadController extends Controller
             'assignedUser'
         ]);
 
-        // Sales Executive sees only assigned leads
-        if (auth()->user()->role !== 'super_admin') {
-
-            $query->where('assigned_user_id', auth()->id());
-
-        }
-
-        // Search
+        // Search Filter
         if ($request->filled('search')) {
-
             $search = trim($request->search);
 
             $query->where(function ($q) use ($search) {
-
                 $q->where('business_name', 'LIKE', "%{$search}%")
-                ->orWhere('phone', 'LIKE', "%{$search}%")
-                ->orWhere('email', 'LIKE', "%{$search}%");
-
+                  ->orWhere('phone', 'LIKE', "%{$search}%")
+                  ->orWhere('email', 'LIKE', "%{$search}%");
             });
-
         }
 
         // Status Filter
         if ($request->filled('status')) {
-
             $query->where('lead_status', $request->status);
-
         }
 
         // Category Filter
         if ($request->filled('category')) {
-
             $query->where('category', 'LIKE', "%{$request->category}%");
-
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Assigned User Filter
+        | Assigned User Filter (Bulletproof for Super Admin & Sales Execs)
         |--------------------------------------------------------------------------
         */
 
         if (
-            auth()->user()->role === 'super_admin' &&
-            $request->filled('assigned_user_id')
+            $request->assigned_user_id === 'unassigned' ||
+            $request->assigned === 'unassigned' ||
+            $request->assigned === 'no'
         ) {
-
-            $query->where(
-                'assigned_user_id',
-                $request->assigned_user_id
-            );
-
+            $query->where(function ($q) {
+                $q->whereNull('assigned_user_id')
+                  ->orWhere('assigned_user_id', 0)
+                  ->orWhere('assigned_user_id', '');
+            });
+        } elseif ($request->filled('assigned_user_id')) {
+            $query->where('assigned_user_id', $request->assigned_user_id);
+        } elseif (auth()->user()->role !== 'super_admin') {
+            $query->where('assigned_user_id', auth()->id());
         }
 
         $perPage = (int) $request->get('per_page', 20);
@@ -158,7 +142,6 @@ class LeadController extends Controller
             'data' => $leads
         ]);
     }
-
 
     /**
      * Update Call Result
@@ -190,7 +173,6 @@ class LeadController extends Controller
         DB::beginTransaction();
 
         try {
-
             $business->update([
                 'lead_status' => $request->status,
                 'call_attempts' => $business->call_attempts + 1,
@@ -222,9 +204,7 @@ class LeadController extends Controller
                     'activities.user'
                 ]),
             ]);
-
         } catch (\Throwable $e) {
-
             DB::rollBack();
 
             return response()->json([
@@ -234,7 +214,6 @@ class LeadController extends Controller
         }
     }
 
-
     public function show(Business $business)
     {
         if (
@@ -242,12 +221,10 @@ class LeadController extends Controller
             &&
             $business->assigned_user_id != auth()->id()
         ) {
-
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized.'
             ], 403);
-
         }
 
         $business->load([
@@ -261,6 +238,4 @@ class LeadController extends Controller
             'data' => $business
         ]);
     }
-
-    
 }
