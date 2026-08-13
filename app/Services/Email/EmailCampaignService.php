@@ -578,7 +578,7 @@ class EmailCampaignService
             ->count();
 
         $sent = $campaign->leads()
-            ->where('status', 'sent')
+            ->whereIn('status', ['sent', 'opened', 'clicked'])
             ->count();
 
         $failed = $campaign->leads()
@@ -720,7 +720,7 @@ class EmailCampaignService
             |--------------------------------------------------------------------------
             */
 
-            $sent = $lockedCampaign->leads()->where('status', 'sent')->count();
+            $sent = $lockedCampaign->leads()->whereIn('status', ['sent', 'opened', 'clicked'])->count();
             $failed = $lockedCampaign->leads()->where('status', 'failed')->count();
 
             $lockedCampaign->update([
