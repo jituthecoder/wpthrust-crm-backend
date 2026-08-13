@@ -312,7 +312,7 @@ class TemplateVariableService
             '{{mobile_screenshot_url}}' => $screenshotUrl ?? '',
 
             '{{mobile_screenshot}}' => $screenshotUrl 
-                ? '<img src="' . htmlspecialchars($screenshotUrl) . '" alt="Website Mobile Screenshot" style="max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #e2e8f0;" />'
+                ? '<img src="' . htmlspecialchars($screenshotUrl) . '" alt="Website Mobile Screenshot" style="max-width: 100%; max-height: 220px; width: auto; height: auto; border-radius: 6px; border: 1px solid #e2e8f0; object-fit: contain; display: block; margin: 0 auto;" />'
                 : '',
 
             '{{desktop_lcp}}' => optional($audit)->desktop_lcp,
