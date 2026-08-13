@@ -94,9 +94,16 @@ class EmailCampaign extends Model
     {
         $sent = (int) $this->sent_count;
         if ($sent <= 0) {
-            return (int) $this->opened_count > 0 ? 100.0 : 0.0;
+            $sent = $this->leads()->whereIn('status', ['sent', 'opened', 'clicked'])->count();
         }
-        return round(($this->opened_count / $sent) * 100, 1);
+        if ($sent <= 0) {
+            return 0.0;
+        }
+        $opened = $this->leads()->whereNotNull('opened_at')->count();
+        if ($opened <= 0 && (int) $this->opened_count > 0) {
+            $opened = (int) $this->opened_count;
+        }
+        return round(($opened / $sent) * 100, 1);
     }
 
     /**
@@ -106,9 +113,16 @@ class EmailCampaign extends Model
     {
         $sent = (int) $this->sent_count;
         if ($sent <= 0) {
-            return (int) $this->clicked_count > 0 ? 100.0 : 0.0;
+            $sent = $this->leads()->whereIn('status', ['sent', 'opened', 'clicked'])->count();
         }
-        return round(($this->clicked_count / $sent) * 100, 1);
+        if ($sent <= 0) {
+            return 0.0;
+        }
+        $clicked = $this->leads()->whereNotNull('clicked_at')->count();
+        if ($clicked <= 0 && (int) $this->clicked_count > 0) {
+            $clicked = (int) $this->clicked_count;
+        }
+        return round(($clicked / $sent) * 100, 1);
     }
 
     /*
