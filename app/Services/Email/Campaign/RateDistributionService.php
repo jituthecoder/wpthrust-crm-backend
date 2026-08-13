@@ -92,7 +92,7 @@ class RateDistributionService
                     $senderIndex++;
 
                     if ($leadIndex === 0) {
-                        $jitteredScheduledAt = now();
+                        $jitteredScheduledAt = now()->subMinutes(5);
                     } else {
                         // Calculate baseline position time
                         $leadBaseTime = $baseScheduleTime->copy()->addSeconds((int) round($leadIndex * $baselineIntervalSeconds));
