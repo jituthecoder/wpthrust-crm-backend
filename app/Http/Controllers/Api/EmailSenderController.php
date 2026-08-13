@@ -222,7 +222,9 @@ class EmailSenderController extends Controller
 
             'subject' => 'nullable|string|max:255',
 
-            'message' => 'required|string',
+            'message' => 'nullable|string',
+
+            'html' => 'nullable|string',
 
         ]);
 

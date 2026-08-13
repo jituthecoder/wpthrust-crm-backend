@@ -139,8 +139,9 @@ class EmailSenderService
         $provider = ProviderFactory::make($sender);
 
         $mailable = (new TestEmail(
-            $payload['message'],
-            $payload['subject'] ?? null
+            $payload['message'] ?? 'Test Email Body',
+            $payload['subject'] ?? null,
+            $payload['html'] ?? null
         ))
             ->to($payload['to'])
             ->from(

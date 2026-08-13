@@ -12,17 +12,23 @@ class TestEmail extends Mailable
 
     public string $messageBody;
     public ?string $customSubject;
+    public ?string $htmlBody;
 
-    public function __construct(string $messageBody, ?string $customSubject = null)
+    public function __construct(string $messageBody, ?string $customSubject = null, ?string $htmlBody = null)
     {
         $this->messageBody = $messageBody;
         $this->customSubject = $customSubject;
+        $this->htmlBody = $htmlBody;
     }
 
     public function build()
     {
-        return $this
-            ->subject($this->customSubject ?? 'WPThrust CRM - Test Email')
-            ->view('emails.test-email');
+        $mail = $this->subject($this->customSubject ?? 'WPThrust CRM - Test Email');
+
+        if (!empty($this->htmlBody)) {
+            return $mail->html($this->htmlBody);
+        }
+
+        return $mail->view('emails.test-email');
     }
 }
