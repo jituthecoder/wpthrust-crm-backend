@@ -18,21 +18,26 @@ class CampaignDeliverySchedulerService
         $dispatchedCount = 0;
         $maxBatch = $maxBatchLimit ?? (int) config('campaign.scheduler_batch_size', 500);
 
-        // Query due leads belonging to running campaigns using chunkById for memory safety
-        CampaignLead::whereHas('campaign', function ($query) {
-            $query->where('status', 'running');
-        })
-            ->due()
-            ->chunkById($chunkSize, function ($leads) use (&$dispatchedCount, $maxBatch) {
-                foreach ($leads as $lead) {
-                    if ($dispatchedCount >= $maxBatch) {
-                        return false; // Stop processing further chunks when batch limit is reached
-                    }
-
-                    if ($this->claimAndDispatch($lead->id)) {
-                        $dispatchedCount++;
-                    }
+        \App\Models\EmailCampaign::where('status', 'running')
+            ->orderBy('id', 'desc')
+            ->each(function ($campaign) use (&$dispatchedCount, $chunkSize, $maxBatch) {
+                if ($dispatchedCount >= $maxBatch) {
+                    return false;
                 }
+
+                $campaign->leads()
+                    ->due()
+                    ->chunkById($chunkSize, function ($leads) use (&$dispatchedCount, $maxBatch) {
+                        foreach ($leads as $lead) {
+                            if ($dispatchedCount >= $maxBatch) {
+                                return false;
+                            }
+
+                            if ($this->claimAndDispatch($lead->id)) {
+                                $dispatchedCount++;
+                            }
+                        }
+                    });
             });
 
         return $dispatchedCount;
