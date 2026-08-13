@@ -11,7 +11,7 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     /**
-     * Login
+     * Login - Supports multi-device logins (Phone + Laptop simultaneously)
      */
     public function login(Request $request)
     {
@@ -28,10 +28,7 @@ class AuthController extends Controller
             ]);
         }
 
-        // Delete old tokens (optional)
-        $user->tokens()->delete();
-
-        // Create new token
+        // Create new token for device without revoking existing device tokens
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
