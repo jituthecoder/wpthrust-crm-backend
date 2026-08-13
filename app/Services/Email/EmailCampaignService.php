@@ -720,8 +720,15 @@ class EmailCampaignService
             |--------------------------------------------------------------------------
             */
 
+            $sent = $lockedCampaign->leads()->where('status', 'sent')->count();
+            $failed = $lockedCampaign->leads()->where('status', 'failed')->count();
+
             $lockedCampaign->update([
                 'status' => 'completed',
+                'total_leads' => $total,
+                'sent_count' => $sent,
+                'failed_count' => $failed,
+                'completed_at' => now(),
             ]);
 
             return true;

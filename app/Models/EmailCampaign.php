@@ -94,7 +94,7 @@ class EmailCampaign extends Model
     {
         $sent = (int) $this->sent_count;
         if ($sent <= 0) {
-            return 0.0;
+            return (int) $this->opened_count > 0 ? 100.0 : 0.0;
         }
         return round(($this->opened_count / $sent) * 100, 1);
     }
@@ -106,7 +106,7 @@ class EmailCampaign extends Model
     {
         $sent = (int) $this->sent_count;
         if ($sent <= 0) {
-            return 0.0;
+            return (int) $this->clicked_count > 0 ? 100.0 : 0.0;
         }
         return round(($this->clicked_count / $sent) * 100, 1);
     }

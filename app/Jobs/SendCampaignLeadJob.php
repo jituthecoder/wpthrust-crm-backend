@@ -345,6 +345,10 @@ class SendCampaignLeadJob implements ShouldQueue
                 'processing_started_at' => null,
             ]);
 
+            if ($lead->campaign) {
+                $lead->campaign->increment('sent_count');
+            }
+
             /*
             |--------------------------------------------------------------------------
             | Check Campaign Completion
