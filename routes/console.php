@@ -8,6 +8,6 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('campaigns:recover')->everyMinute()->withoutOverlapping();
-Schedule::command('campaigns:process')->everyMinute()->withoutOverlapping();
-Schedule::command('psi:fetch --limit=20')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('campaigns:recover')->everyMinute()->withoutOverlapping(5);
+Schedule::command('campaigns:process')->everyMinute()->withoutOverlapping(5);
+Schedule::command('psi:fetch --limit=20')->everyFiveMinutes()->withoutOverlapping(10);
