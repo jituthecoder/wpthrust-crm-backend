@@ -18,6 +18,9 @@ class BusinessImportService
      */
     public function import(UploadedFile $file): array
     {
+        @set_time_limit(600);
+        @ini_set('memory_limit', '512M');
+
         $handle = fopen($file->getRealPath(), 'r');
 
         if (!$handle) {
@@ -28,11 +31,20 @@ class BusinessImportService
         $header = fgetcsv($handle);
 
         if (!$header) {
-            throw new \Exception('Invalid CSV.');
+            fclose($handle);
+            throw new \Exception('Invalid CSV file or empty header.');
         }
 
         // Remove UTF8 BOM
         $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', $header[0]);
+        $header = array_map('trim', $header);
+
+        // Pre-fetch existing unique identifiers for O(1) duplicate checks
+        $existingWebsites = array_flip(array_filter(Business::whereNotNull('website')->where('website', '!=', '')->pluck('website')->map(fn($w) => strtolower(trim($w)))->toArray()));
+        $existingPhones = array_flip(array_filter(Business::whereNotNull('phone')->where('phone', '!=', '')->pluck('phone')->map(fn($p) => trim($p))->toArray()));
+        $existingEmails = array_flip(array_filter(Business::whereNotNull('email')->where('email', '!=', '')->pluck('email')->map(fn($e) => strtolower(trim($e)))->toArray()));
+
+        $psiJobs = [];
 
         while (($row = fgetcsv($handle, 0, ',')) !== false) {
 
@@ -42,25 +54,57 @@ class BusinessImportService
 
             $data = array_combine($header, $row);
 
+            $website = $this->clean($data['Website'] ?? '');
+            $phone = $this->clean($data['Phone'] ?? '');
+            $email = strtolower($this->clean($data['Email'] ?? '') ?: '');
+
+            $websiteKey = strtolower($website ?? '');
+            $emailKey = strtolower($email);
+
+            // Duplicate Check against DB and current batch
+            if (
+                (!empty($websiteKey) && isset($existingWebsites[$websiteKey])) ||
+                (!empty($phone) && isset($existingPhones[$phone])) ||
+                (!empty($emailKey) && isset($existingEmails[$emailKey]))
+            ) {
+                $this->skipped++;
+                continue;
+            }
+
             try {
 
                 DB::beginTransaction();
 
-                $business = $this->createBusiness($data);
-
-                if (!$business) {
-
-                    DB::rollBack();
-
-                    continue;
-                }
+                $business = Business::create([
+                    'business_name' => $this->clean($data['Business Name'] ?? null),
+                    'category' => $this->clean($data['Category'] ?? null),
+                    'phone' => $phone,
+                    'email' => $email,
+                    'website' => $website,
+                    'address' => $this->clean($data['Address'] ?? null),
+                    'city' => $this->clean($data['City'] ?? null),
+                    'state' => $this->clean($data['State'] ?? null),
+                    'zip_code' => $this->clean($data['Zip Code'] ?? null),
+                    'country' => $this->clean($data['Country'] ?? null),
+                    'lead_source' => 'google_maps',
+                    'lead_status' => 'new',
+                    'lead_priority' => 1,
+                    'call_attempts' => 0,
+                    'is_called' => false,
+                    'is_archived' => false,
+                ]);
 
                 $this->createAudit($business, $data);
 
                 DB::commit();
 
+                // Track in-memory so duplicates inside the same CSV are also skipped
+                if (!empty($websiteKey)) $existingWebsites[$websiteKey] = true;
+                if (!empty($phone)) $existingPhones[$phone] = true;
+                if (!empty($emailKey)) $existingEmails[$emailKey] = true;
+
                 if (!empty($business->website)) {
-                    \App\Jobs\FetchBusinessPsiJob::dispatch($business);
+                    $psiJobs[] = $business;
                 }
 
                 $this->imported++;
@@ -70,11 +114,8 @@ class BusinessImportService
                 DB::rollBack();
 
                 $this->errors[] = [
-
                     'business' => $data['Business Name'] ?? '',
-
                     'error' => $e->getMessage(),
-
                 ];
             }
 
@@ -82,16 +123,16 @@ class BusinessImportService
 
         fclose($handle);
 
+        // Dispatch PSI Jobs
+        foreach ($psiJobs as $b) {
+            \App\Jobs\FetchBusinessPsiJob::dispatch($b);
+        }
+
         return [
-
             'success' => true,
-
             'imported' => $this->imported,
-
             'skipped' => $this->skipped,
-
             'errors' => $this->errors,
-
         ];
     }
 

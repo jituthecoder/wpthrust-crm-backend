@@ -21,6 +21,9 @@ class BusinessImportController extends Controller
      */
     public function import(Request $request)
     {
+        @set_time_limit(600);
+        @ini_set('memory_limit', '512M');
+
         try {
 
             $request->validate([
