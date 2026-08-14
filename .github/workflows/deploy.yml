@@ -12,4 +12,4 @@ jobs:
     steps:
       - name: Trigger Hostinger Auto-Deployment Webhook
         run: |
-          curl -s -S -f "https://api-crm.wpthrust.in/deploy-webhook.php?secret=wpthrust_crm_deploy_secret_2026"
+          curl -s -S -f "https://api-crm.wpthrust.in/api/deploy-webhook?secret=wpthrust_crm_deploy_secret_2026"
