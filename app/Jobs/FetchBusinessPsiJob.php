@@ -53,19 +53,18 @@ class FetchBusinessPsiJob implements ShouldQueue
 
         try {
             $psiService->analyzeBusiness($this->business);
-            Log::info("PSI analysis completed successfully for Business #{$this->business->id} ({$this->business->website}).");
+            Log::info("PSI analysis completed for Business #{$this->business->id} ({$this->business->website}).");
         } catch (\Throwable $e) {
-            Log::error("PSI analysis failed for Business #{$this->business->id} ({$this->business->website}): " . $e->getMessage());
+            Log::warning("PSI analysis error for Business #{$this->business->id} ({$this->business->website}): " . $e->getMessage());
 
             BusinessAudit::updateOrCreate(
                 ['business_id' => $this->business->id],
                 [
                     'psi_status' => 'failed',
-                    'psi_error_reason' => $e->getMessage(),
+                    'psi_error_reason' => mb_substr($e->getMessage(), 0, 255),
+                    'psi_fetched_at' => now(),
                 ]
             );
-
-            throw $e;
         }
     }
 }

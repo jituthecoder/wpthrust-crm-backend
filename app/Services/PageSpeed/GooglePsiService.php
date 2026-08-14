@@ -46,7 +46,16 @@ class GooglePsiService
 
         if (!$response->successful()) {
             $err = $response->json('error.message') ?? $response->body() ?? 'Failed to fetch PageSpeed Insights data';
-            throw new \RuntimeException("Google PSI API error: " . $err);
+            Log::warning("Google PSI audit skipped for Business #{$business->id} ({$website}): {$err}");
+
+            return BusinessAudit::updateOrCreate(
+                ['business_id' => $business->id],
+                [
+                    'psi_status' => 'failed',
+                    'psi_error_reason' => mb_substr($err, 0, 255),
+                    'psi_fetched_at' => now(),
+                ]
+            );
         }
 
         $data = $response->json();
