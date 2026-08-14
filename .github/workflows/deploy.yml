@@ -10,16 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: SSH and Deploy to Hostinger
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.HOSTINGER_HOST }}
-          username: ${{ secrets.HOSTINGER_USERNAME }}
-          password: ${{ secrets.HOSTINGER_PASSWORD }}
-          port: ${{ secrets.HOSTINGER_PORT || 65002 }}
-          script: |
-            cd /home/u971218733/domains/wpthrust.in/public_html/crm-api
-            git pull origin main
-            /opt/alt/php83/usr/bin/php artisan migrate --force
-            /opt/alt/php83/usr/bin/php artisan config:clear
-            /opt/alt/php83/usr/bin/php artisan cache:clear
+      - name: Trigger Hostinger Auto-Deployment Webhook
+        run: |
+          curl -s -S -f "https://api-crm.wpthrust.in/deploy-webhook.php?secret=wpthrust_crm_deploy_secret_2026"
