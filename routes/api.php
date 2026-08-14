@@ -118,7 +118,7 @@ Route::middleware('auth:sanctum')->group(function () {
             [UserController::class, 'updatePassword']
         );
 
-
+ 
         /*
         |--------------------------------------------------------------------------
         | Email Senders
