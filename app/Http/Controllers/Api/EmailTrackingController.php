@@ -106,6 +106,7 @@ class EmailTrackingController extends Controller
                 \App\Models\UnsubscribedEmail::firstOrCreate(
                     [
                         'organization_id' => $orgId,
+                        'campaign_id' => $lead->email_campaign_id,
                         'email' => $emailAddress,
                     ],
                     [

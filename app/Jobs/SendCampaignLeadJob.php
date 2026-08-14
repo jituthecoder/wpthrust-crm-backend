@@ -77,7 +77,17 @@ class SendCampaignLeadJob implements ShouldQueue
 
         $email = $lead->business?->email;
         $orgId = $lead->campaign?->organization_id;
-        if ($lead->status === 'unsubscribed' || ($orgId && $email && \App\Models\UnsubscribedEmail::where('organization_id', $orgId)->where('email', $email)->exists())) {
+        $campaignId = $lead->email_campaign_id;
+
+        $isUnsubscribed = $lead->status === 'unsubscribed' || ($email && \App\Models\UnsubscribedEmail::where('email', $email)
+            ->where(function ($query) use ($orgId, $campaignId) {
+                $query->where('campaign_id', $campaignId);
+                if ($orgId) {
+                    $query->orWhere('organization_id', $orgId);
+                }
+            })->exists());
+
+        if ($isUnsubscribed) {
             $lead->update(['status' => 'unsubscribed', 'unsubscribed_at' => $lead->unsubscribed_at ?? now()]);
             return;
         }
