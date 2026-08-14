@@ -52,6 +52,8 @@ class EmailCampaignController extends Controller
         })
             ->with([
                 'template',
+                'sequenceSteps.template',
+                'senders.sender',
                 'creator',
             ]);
 
