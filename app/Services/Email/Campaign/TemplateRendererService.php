@@ -3,9 +3,17 @@
 namespace App\Services\Email\Campaign;
 
 use App\Models\Business;
+use App\Services\Email\TemplateVariableService;
 
 class TemplateRendererService
 {
+    protected TemplateVariableService $variableService;
+
+    public function __construct(TemplateVariableService $variableService)
+    {
+        $this->variableService = $variableService;
+    }
+
     /**
      * Render Subject
      */
@@ -13,7 +21,7 @@ class TemplateRendererService
         string $subject,
         Business $business
     ): string {
-        return $this->replaceVariables(
+        return $this->variableService->render(
             $subject,
             $business
         );
@@ -26,7 +34,7 @@ class TemplateRendererService
         string $html,
         Business $business
     ): string {
-        return $this->replaceVariables(
+        return $this->variableService->render(
             $html,
             $business
         );
@@ -44,56 +52,9 @@ class TemplateRendererService
             return null;
         }
 
-        return $this->replaceVariables(
+        return $this->variableService->render(
             $text,
             $business
-        );
-    }
-
-    /**
-     * Replace Variables
-     */
-    protected function replaceVariables(
-        string $content,
-        Business $business
-    ): string {
-
-        $variables = [
-
-            '{{business_name}}' => $business->business_name,
-
-            '{{website}}' => $business->website,
-
-            '{{email}}' => $business->email,
-
-            '{{phone}}' => $business->phone,
-
-            '{{category}}' => $business->category,
-
-            '{{address}}' => $business->address,
-
-            '{{city}}' => $business->city,
-
-            '{{state}}' => $business->state,
-
-            '{{zip_code}}' => $business->zip_code,
-
-            '{{country}}' => $business->country,
-
-            '{{today}}' => now()->format('d M Y'),
-
-            '{{current_year}}' => now()->year,
-
-        ];
-
-        return str_replace(
-
-            array_keys($variables),
-
-            array_values($variables),
-
-            $content
-
         );
     }
 }

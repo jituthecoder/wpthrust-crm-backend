@@ -258,56 +258,65 @@ class TemplateVariableService
         Business $business
     ): string
     {
+        $business->loadMissing('audit');
         $audit = $business->audit;
         $screenshotUrl = optional($audit)->mobile_screenshot_url;
 
         $replace = [
 
-            '{{business_name}}' => $business->business_name,
+            '{{business_name}}' => $business->business_name ?? '',
 
-            '{{website}}' => $business->website,
+            '{{website}}' => $business->website ?? '',
 
-            '{{email}}' => $business->email,
+            '{{email}}' => $business->email ?? '',
 
-            '{{phone}}' => $business->phone,
+            '{{phone}}' => $business->phone ?? '',
 
-            '{{address}}' => $business->address,
+            '{{category}}' => $business->category ?? '',
 
-            '{{city}}' => $business->city,
+            '{{address}}' => $business->address ?? '',
 
-            '{{state}}' => $business->state,
+            '{{city}}' => $business->city ?? '',
 
-            '{{country}}' => $business->country,
+            '{{state}}' => $business->state ?? '',
 
-            '{{average_rating}}' => optional($audit)->average_rating,
+            '{{zip_code}}' => $business->zip_code ?? '',
 
-            '{{review_count}}' => optional($audit)->review_count,
+            '{{country}}' => $business->country ?? '',
 
-            '{{mobile_pagespeed}}' => optional($audit)->mobile_pagespeed,
+            '{{today}}' => now()->format('d M Y'),
 
-            '{{desktop_pagespeed}}' => optional($audit)->desktop_pagespeed,
+            '{{current_year}}' => now()->year,
 
-            '{{mobile_seo}}' => optional($audit)->mobile_seo,
+            '{{average_rating}}' => optional($audit)->average_rating ?? '',
 
-            '{{desktop_seo}}' => optional($audit)->desktop_seo,
+            '{{review_count}}' => optional($audit)->review_count ?? '',
 
-            '{{mobile_accessibility}}' => optional($audit)->mobile_accessibility,
+            '{{mobile_pagespeed}}' => optional($audit)->mobile_pagespeed ?? '',
 
-            '{{desktop_accessibility}}' => optional($audit)->desktop_accessibility,
+            '{{desktop_pagespeed}}' => optional($audit)->desktop_pagespeed ?? '',
 
-            '{{mobile_load_time}}' => optional($audit)->mobile_load_time,
+            '{{mobile_seo}}' => optional($audit)->mobile_seo ?? '',
 
-            '{{desktop_load_time}}' => optional($audit)->desktop_load_time,
+            '{{desktop_seo}}' => optional($audit)->desktop_seo ?? '',
 
-            '{{mobile_lcp}}' => optional($audit)->mobile_lcp,
+            '{{mobile_accessibility}}' => optional($audit)->mobile_accessibility ?? '',
 
-            '{{mobile_fcp}}' => optional($audit)->mobile_fcp,
+            '{{desktop_accessibility}}' => optional($audit)->desktop_accessibility ?? '',
 
-            '{{mobile_tbt}}' => optional($audit)->mobile_tbt,
+            '{{mobile_load_time}}' => optional($audit)->mobile_load_time ?? '',
 
-            '{{mobile_cls}}' => optional($audit)->mobile_cls,
+            '{{desktop_load_time}}' => optional($audit)->desktop_load_time ?? '',
 
-            '{{mobile_speed_index}}' => optional($audit)->mobile_speed_index,
+            '{{mobile_lcp}}' => optional($audit)->mobile_lcp ?? '',
+
+            '{{mobile_fcp}}' => optional($audit)->mobile_fcp ?? '',
+
+            '{{mobile_tbt}}' => optional($audit)->mobile_tbt ?? '',
+
+            '{{mobile_cls}}' => optional($audit)->mobile_cls ?? '',
+
+            '{{mobile_speed_index}}' => optional($audit)->mobile_speed_index ?? '',
 
             '{{mobile_screenshot_url}}' => $screenshotUrl ?? '',
 
@@ -315,13 +324,13 @@ class TemplateVariableService
                 ? '<img src="' . htmlspecialchars($screenshotUrl) . '" alt="Website Mobile Screenshot" style="max-width: 100%; max-height: 220px; width: auto; height: auto; border-radius: 6px; border: 1px solid #e2e8f0; object-fit: contain; display: block; margin: 0 auto;" />'
                 : '',
 
-            '{{desktop_lcp}}' => optional($audit)->desktop_lcp,
+            '{{desktop_lcp}}' => optional($audit)->desktop_lcp ?? '',
 
-            '{{facebook}}' => optional($audit)->facebook,
+            '{{facebook}}' => optional($audit)->facebook ?? '',
 
-            '{{instagram}}' => optional($audit)->instagram,
+            '{{instagram}}' => optional($audit)->instagram ?? '',
 
-            '{{linkedin}}' => optional($audit)->linkedin,
+            '{{linkedin}}' => optional($audit)->linkedin ?? '',
 
             '{{contact_form}}' => optional($audit)->contact_form
                 ? 'Available'
