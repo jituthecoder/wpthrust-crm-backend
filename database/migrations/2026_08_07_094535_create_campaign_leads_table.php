@@ -63,6 +63,8 @@ return new class extends Migration
 
                 'replied',
 
+                'unsubscribed',
+
                 'skipped',
 
             ])->default('pending');

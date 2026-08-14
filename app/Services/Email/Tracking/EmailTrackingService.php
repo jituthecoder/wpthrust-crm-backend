@@ -20,7 +20,37 @@ class EmailTrackingService
         }
 
         $htmlWithClickTracking = $this->rewriteLinks($html, $lead);
-        return $this->injectOpenPixel($htmlWithClickTracking, $lead);
+        $htmlWithUnsubscribe = $this->injectUnsubscribeFooter($htmlWithClickTracking, $lead);
+        return $this->injectOpenPixel($htmlWithUnsubscribe, $lead);
+    }
+
+    /**
+     * Inject Unsubscribe footer link or replace {{unsubscribe_url}} placeholder.
+     */
+    public function injectUnsubscribeFooter(string $html, CampaignLead $lead): string
+    {
+        if (empty($lead->unsubscribe_token)) {
+            $lead->unsubscribe_token = \Illuminate\Support\Str::random(32);
+            $lead->saveQuietly();
+        }
+
+        $baseUrl = rtrim(config('app.url'), '/');
+        $unsubscribeUrl = "{$baseUrl}/api/track/unsubscribe/{$lead->unsubscribe_token}";
+
+        if (str_contains($html, '{{unsubscribe_url}}')) {
+            return str_replace('{{unsubscribe_url}}', htmlspecialchars($unsubscribeUrl, ENT_QUOTES, 'UTF-8'), $html);
+        }
+
+        $footerHtml = sprintf(
+            '<div style="margin-top: 32px; border-top: 1px solid #e2e8f0; padding-top: 16px; text-align: center; font-family: sans-serif; font-size: 11px; color: #94a3b8;"><p style="margin: 0;">If you no longer wish to receive these emails, you can <a href="%s" style="color: #64748b; text-decoration: underline;">unsubscribe here</a>.</p></div>',
+            htmlspecialchars($unsubscribeUrl, ENT_QUOTES, 'UTF-8')
+        );
+
+        if (stripos($html, '</body>') !== false) {
+            return str_ireplace('</body>', $footerHtml . '</body>', $html);
+        }
+
+        return $html . $footerHtml;
     }
 
     /**

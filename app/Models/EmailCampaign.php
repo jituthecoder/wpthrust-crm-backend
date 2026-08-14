@@ -70,6 +70,10 @@ class EmailCampaign extends Model
 
         'organization_id',
 
+        'auto_sync_enabled',
+
+        'auto_sync_criteria',
+
     ];
 
     protected $casts = [
@@ -79,6 +83,10 @@ class EmailCampaign extends Model
         'started_at' => 'datetime',
 
         'completed_at' => 'datetime',
+
+        'auto_sync_enabled' => 'boolean',
+
+        'auto_sync_criteria' => 'array',
 
     ];
 
@@ -181,6 +189,16 @@ class EmailCampaign extends Model
         return $this->hasMany(
             CampaignLead::class
         );
+    }
+
+    /**
+     * Sequence Steps
+     */
+    public function sequenceSteps()
+    {
+        return $this->hasMany(
+            CampaignSequenceStep::class
+        )->orderBy('step_number', 'asc');
     }
 
     /**

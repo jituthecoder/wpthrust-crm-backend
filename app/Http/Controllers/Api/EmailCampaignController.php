@@ -254,6 +254,8 @@ class EmailCampaignController extends Controller
 
                 'template.currentVersion',
 
+                'sequenceSteps.template',
+
                 'creator',
 
                 'senders.sender',

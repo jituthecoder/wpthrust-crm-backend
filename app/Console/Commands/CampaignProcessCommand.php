@@ -24,12 +24,15 @@ class CampaignProcessCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(CampaignDeliverySchedulerService $scheduler): int
-    {
+    public function handle(
+        CampaignDeliverySchedulerService $scheduler,
+        \App\Services\Email\Campaign\CampaignSequenceSchedulerService $sequenceScheduler
+    ): int {
         $chunkSize = (int) $this->option('chunk');
         $dispatched = $scheduler->processDueLeads($chunkSize);
+        $sequenceDispatched = $sequenceScheduler->processDueSequenceSteps();
 
-        $this->info("Processed due campaign leads. Dispatched {$dispatched} job(s).");
+        $this->info("Processed due campaign leads. Dispatched {$dispatched} initial job(s) and {$sequenceDispatched} follow-up step(s).");
 
         return Command::SUCCESS;
     }

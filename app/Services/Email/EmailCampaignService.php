@@ -66,6 +66,10 @@ class EmailCampaignService
 
                 'scheduled_at' => $data['scheduled_at'] ?? null,
 
+                'auto_sync_enabled' => $data['auto_sync_enabled'] ?? false,
+
+                'auto_sync_criteria' => $data['auto_sync_criteria'] ?? null,
+
                 'status' => empty($data['scheduled_at'])
                     ? 'draft'
                     : 'scheduled',
@@ -73,6 +77,30 @@ class EmailCampaignService
                 'created_by' => Auth::id(),
 
             ]);
+
+            // Save sequence steps if provided
+            \App\Models\CampaignSequenceStep::where('email_campaign_id', $campaign->id)->delete();
+            \App\Models\CampaignSequenceStep::create([
+                'email_campaign_id' => $campaign->id,
+                'step_number' => 1,
+                'email_template_id' => $data['email_template_id'],
+                'delay_days' => 0,
+                'condition' => 'always',
+            ]);
+
+            if (!empty($data['sequence_steps']) && is_array($data['sequence_steps'])) {
+                foreach ($data['sequence_steps'] as $idx => $stepData) {
+                    $stepNum = $idx + 2; // Step 2, Step 3...
+                    \App\Models\CampaignSequenceStep::create([
+                        'email_campaign_id' => $campaign->id,
+                        'step_number' => $stepNum,
+                        'email_template_id' => $stepData['email_template_id'] ?? $data['email_template_id'],
+                        'delay_days' => (int) ($stepData['delay_days'] ?? 2),
+                        'delay_hours' => (int) ($stepData['delay_hours'] ?? 0),
+                        'condition' => $stepData['condition'] ?? 'always',
+                    ]);
+                }
+            }
 
             /*
             |--------------------------------------------------------------------------
@@ -184,7 +212,35 @@ class EmailCampaignService
 
                 'scheduled_at' => $data['scheduled_at'] ?? null,
 
+                'auto_sync_enabled' => $data['auto_sync_enabled'] ?? false,
+
+                'auto_sync_criteria' => $data['auto_sync_criteria'] ?? null,
+
             ]);
+
+            // Save sequence steps if provided
+            \App\Models\CampaignSequenceStep::where('email_campaign_id', $campaign->id)->delete();
+            \App\Models\CampaignSequenceStep::create([
+                'email_campaign_id' => $campaign->id,
+                'step_number' => 1,
+                'email_template_id' => $data['email_template_id'],
+                'delay_days' => 0,
+                'condition' => 'always',
+            ]);
+
+            if (!empty($data['sequence_steps']) && is_array($data['sequence_steps'])) {
+                foreach ($data['sequence_steps'] as $idx => $stepData) {
+                    $stepNum = $idx + 2;
+                    \App\Models\CampaignSequenceStep::create([
+                        'email_campaign_id' => $campaign->id,
+                        'step_number' => $stepNum,
+                        'email_template_id' => $stepData['email_template_id'] ?? $data['email_template_id'],
+                        'delay_days' => (int) ($stepData['delay_days'] ?? 2),
+                        'delay_hours' => (int) ($stepData['delay_hours'] ?? 0),
+                        'condition' => $stepData['condition'] ?? 'always',
+                    ]);
+                }
+            }
 
             /*
             |--------------------------------------------------------------------------

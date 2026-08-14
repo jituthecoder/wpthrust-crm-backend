@@ -27,9 +27,10 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::get('/oauth/google/redirect', [OAuthController::class, 'googleRedirect']);
 Route::get('/oauth/google/callback', [OAuthController::class, 'googleCallback']);
 
-// Email Open & Click Tracking Routes
+// Email Open, Click & Unsubscribe Tracking Routes
 Route::get('/track/open/{campaignLead}', [EmailTrackingController::class, 'trackOpen']);
 Route::get('/track/click/{campaignLead}', [EmailTrackingController::class, 'trackClick']);
+Route::get('/track/unsubscribe/{token}', [EmailTrackingController::class, 'trackUnsubscribe']);
 
 /*
 |--------------------------------------------------------------------------

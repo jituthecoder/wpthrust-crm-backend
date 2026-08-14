@@ -84,6 +84,10 @@ class CampaignLead extends Model
 
         'replied_at',
 
+        'unsubscribe_token',
+
+        'unsubscribed_at',
+
     ];
 
     protected $attributes = [
@@ -112,7 +116,20 @@ class CampaignLead extends Model
 
         'replied_at' => 'datetime',
 
+        'unsubscribed_at' => 'datetime',
+
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($lead) {
+            if (empty($lead->unsubscribe_token)) {
+                $lead->unsubscribe_token = \Illuminate\Support\Str::random(32);
+            }
+        });
+    }
 
     /*
     |--------------------------------------------------------------------------

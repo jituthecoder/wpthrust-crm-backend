@@ -89,6 +89,13 @@ class GooglePsiService
             ]
         );
 
+        // Trigger Auto-Sync for matching running campaigns
+        try {
+            app(\App\Services\Email\Campaign\CampaignAutoSyncService::class)->syncMatchingLeads($business->fresh(['audit']));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Auto-sync error for Business #{$business->id}: " . $e->getMessage());
+        }
+
         return $audit;
     }
 

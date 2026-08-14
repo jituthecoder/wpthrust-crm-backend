@@ -44,6 +44,19 @@ class Business extends Model
         ];
     }
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::created(function ($business) {
+            try {
+                app(\App\Services\Email\Campaign\CampaignAutoSyncService::class)->syncMatchingLeads($business);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("Auto-sync error on Business creation #{$business->id}: " . $e->getMessage());
+            }
+        });
+    }
+
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);

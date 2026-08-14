@@ -85,13 +85,27 @@ class EmailCampaignRequest extends FormRequest
             */
 
             'businesses' => [
-                'required',
+                'nullable',
                 'array',
-                'min:1'
             ],
 
             'businesses.*' => [
                 'exists:businesses,id'
+            ],
+
+            'sequence_steps' => [
+                'nullable',
+                'array',
+            ],
+
+            'auto_sync_enabled' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'auto_sync_criteria' => [
+                'nullable',
+                'array',
             ],
 
         ];
