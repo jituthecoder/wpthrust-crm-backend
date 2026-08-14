@@ -16,7 +16,7 @@ jobs:
           host: ${{ secrets.HOSTINGER_HOST }}
           username: ${{ secrets.HOSTINGER_USERNAME }}
           password: ${{ secrets.HOSTINGER_PASSWORD }}
-          port: ${{ secrets.HOSTINGER_PORT || 22 }}
+          port: ${{ secrets.HOSTINGER_PORT || 65002 }}
           script: |
             cd /home/u971218733/domains/wpthrust.in/public_html/crm-api
             git pull origin main
