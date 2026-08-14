@@ -34,33 +34,45 @@ Route::get('/track/unsubscribe/{token}', [EmailTrackingController::class, 'track
 
 // Auto-Deployment Webhook Route
 Route::get('/deploy-webhook', function (\Illuminate\Http\Request $request) {
-    $secretToken = 'wpthrust_crm_deploy_secret_2026';
-    $providedToken = $request->query('secret') ?? $request->header('X-Deploy-Secret') ?? '';
+    try {
+        $secretToken = 'wpthrust_crm_deploy_secret_2026';
+        $providedToken = (string) ($request->query('secret') ?? $request->header('X-Deploy-Secret') ?? '');
 
-    if (empty($providedToken) || !hash_equals($secretToken, $providedToken)) {
-        return response()->json(['success' => false, 'message' => 'Unauthorized deploy secret.'], 403);
+        if (empty($providedToken) || !hash_equals($secretToken, $providedToken)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized deploy secret.'], 403);
+        }
+
+        $baseDir = base_path();
+        @chdir($baseDir);
+
+        $gitOutput = [];
+        $gitCode = 0;
+        if (function_exists('exec')) {
+            @exec('git pull origin main 2>&1', $gitOutput, $gitCode);
+        } else {
+            $gitOutput[] = 'exec() disabled';
+        }
+
+        $migrateOutput = [];
+        $migrateCode = 0;
+        if (function_exists('exec')) {
+            @exec('/opt/alt/php83/usr/bin/php artisan migrate --force 2>&1', $migrateOutput, $migrateCode);
+            @exec('/opt/alt/php83/usr/bin/php artisan config:clear 2>&1');
+            @exec('/opt/alt/php83/usr/bin/php artisan cache:clear 2>&1');
+        }
+
+        return response()->json([
+            'success' => true,
+            'timestamp' => now()->toDateTimeString(),
+            'git' => implode("\n", $gitOutput),
+            'migrate' => implode("\n", $migrateOutput),
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+        ], 500);
     }
-
-    $baseDir = base_path();
-    chdir($baseDir);
-
-    $gitOutput = [];
-    $gitCode = 0;
-    exec('git pull origin main 2>&1', $gitOutput, $gitCode);
-
-    $migrateOutput = [];
-    $migrateCode = 0;
-    exec('/opt/alt/php83/usr/bin/php artisan migrate --force 2>&1', $migrateOutput, $migrateCode);
-
-    exec('/opt/alt/php83/usr/bin/php artisan config:clear 2>&1');
-    exec('/opt/alt/php83/usr/bin/php artisan cache:clear 2>&1');
-
-    return response()->json([
-        'success' => true,
-        'timestamp' => now()->toDateTimeString(),
-        'git' => implode("\n", $gitOutput),
-        'migrate' => implode("\n", $migrateOutput),
-    ]);
 });
 
 /*
