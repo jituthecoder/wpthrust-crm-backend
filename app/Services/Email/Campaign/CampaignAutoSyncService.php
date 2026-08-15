@@ -23,8 +23,9 @@ class CampaignAutoSyncService
 
         $attachedCount = 0;
 
-        $autoSyncCampaigns = EmailCampaign::where('status', 'running')
-            ->where('auto_sync_enabled', true)
+        // Support running, completed, and scheduled campaigns with auto-sync enabled
+        $autoSyncCampaigns = EmailCampaign::where('auto_sync_enabled', true)
+            ->whereIn('status', ['running', 'completed', 'scheduled'])
             ->get();
 
         foreach ($autoSyncCampaigns as $campaign) {
@@ -40,16 +41,30 @@ class CampaignAutoSyncService
             $criteria = $campaign->auto_sync_criteria ?? [];
 
             if ($this->matchesCriteria($business, $criteria)) {
+                // Reactivate completed campaign to running if new leads arrive
+                if ($campaign->status === 'completed') {
+                    $campaign->update(['status' => 'running']);
+                }
+
                 // Attach business as a pending lead scheduled for immediate dispatch
-                CampaignLead::create([
+                $lead = CampaignLead::create([
                     'email_campaign_id' => $campaign->id,
                     'business_id' => $business->id,
                     'status' => 'pending',
-                    'scheduled_at' => now()->subMinutes(5),
+                    'scheduled_at' => now(),
                 ]);
 
                 $campaign->increment('total_leads');
                 $attachedCount++;
+
+                // Dispatch email job immediately if campaign is running
+                if ($campaign->status === 'running') {
+                    try {
+                        \App\Jobs\SendCampaignLeadJob::dispatch($lead);
+                    } catch (\Throwable $e) {
+                        Log::warning("Failed to dispatch auto-synced lead #{$lead->id}: " . $e->getMessage());
+                    }
+                }
 
                 Log::info("Auto-synced Lead #{$business->id} ({$business->email}) to Campaign #{$campaign->id} ({$campaign->name})");
             }
@@ -81,24 +96,35 @@ class CampaignAutoSyncService
             if ($criteria['has_screenshot'] === 'no' && $hasScreenshot) return false;
         }
 
-        // 3. Category Check
+        // 3. Category Substring Check
         if (!empty($criteria['category'])) {
-            if (strtolower(trim($business->category ?? '')) !== strtolower(trim($criteria['category']))) {
+            $cat = strtolower(trim($business->category ?? ''));
+            $targetCat = strtolower(trim($criteria['category']));
+            if (!str_contains($cat, $targetCat)) {
                 return false;
             }
         }
 
-        // 4. PSI Score Range Check
+        // 4. Country Substring Check
+        if (!empty($criteria['country'])) {
+            $country = strtolower(trim($business->country ?? ''));
+            $targetCountry = strtolower(trim($criteria['country']));
+            if (!str_contains($country, $targetCountry)) {
+                return false;
+            }
+        }
+
+        // 5. PSI Score Range Check
         if (!empty($criteria['psi_filter'])) {
             $score = (int) ($business->audit?->mobile_pagespeed ?? 0);
             $hasAudit = !empty($business->audit);
 
             switch ($criteria['psi_filter']) {
                 case 'less_50':
-                    if (!$hasAudit || $score >= 50) return false;
+                    if (!$hasAudit || $score <= 0 || $score >= 50) return false;
                     break;
                 case 'less_90':
-                    if (!$hasAudit || $score >= 90) return false;
+                    if (!$hasAudit || $score <= 0 || $score >= 90) return false;
                     break;
                 case 'good_90':
                     if (!$hasAudit || $score < 90) return false;
