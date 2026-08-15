@@ -32,34 +32,34 @@ class ReauditMissingScreenshotsCommand extends Command
         $force = $this->option('force');
         $this->info('Scanning businesses for missing PageSpeed audits or missing screenshot files...');
 
-        $dispatched = 0;
+        $query = Business::whereNotNull('website')
+            ->where('website', '!=', '')
+            ->where('website', '!=', '-');
 
-        if ($force) {
-            $businesses = Business::whereNotNull('website')
-                ->where('website', '!=', '')
-                ->where('website', '!=', '-')
-                ->select('id')
-                ->get();
-        } else {
-            $businesses = Business::whereNotNull('website')
-                ->where('website', '!=', '')
-                ->where('website', '!=', '-')
-                ->where(function ($q) {
-                    $q->whereDoesntHave('audit')
-                      ->orWhereHas('audit', function ($sq) {
-                          $sq->whereNull('mobile_screenshot_path')->orWhere('mobile_screenshot_path', '');
-                      });
-                })
-                ->select('id')
-                ->get();
+        if (!$force) {
+            $query->where(function ($q) {
+                $q->whereDoesntHave('audit')
+                  ->orWhereHas('audit', function ($sq) {
+                      $sq->whereNull('mobile_screenshot_path')->orWhere('mobile_screenshot_path', '');
+                  });
+            });
         }
 
-        foreach ($businesses as $business) {
-            FetchBusinessPsiJob::dispatch($business);
-            $dispatched++;
+        $businessIds = $query->pluck('id');
+        $count = 0;
+
+        foreach ($businessIds->chunk(200) as $chunk) {
+            foreach ($chunk as $bId) {
+                $audit = BusinessAudit::updateOrCreate(
+                    ['business_id' => $bId],
+                    ['psi_status' => 'pending', 'mobile_screenshot_path' => null]
+                );
+                FetchBusinessPsiJob::dispatch($audit->business);
+                $count++;
+            }
         }
 
-        $this->info("Successfully queued {$dispatched} business leads for PageSpeed re-audit and screenshot generation.");
+        $this->info("Successfully queued {$count} business leads for PageSpeed re-audit.");
 
         return Command::SUCCESS;
     }
