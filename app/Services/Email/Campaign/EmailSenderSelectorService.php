@@ -35,22 +35,18 @@ class EmailSenderSelectorService
 
         /*
         |--------------------------------------------------------------------------
-        | Filter Senders By Capacity Engine
+        | Filter & Prioritize Senders By Hourly Capacity Ratio
         |--------------------------------------------------------------------------
         */
 
         $capacityService = app(SenderCapacityService::class);
 
         $availableSenders = $senders->filter(function ($campaignSender) use ($capacityService) {
-
             $sender = $campaignSender->sender;
-
             if (!$sender) {
                 return false;
             }
-
             return $capacityService->canReserve($sender);
-
         })->values();
 
         if ($availableSenders->isEmpty()) {
@@ -59,28 +55,22 @@ class EmailSenderSelectorService
 
         /*
         |--------------------------------------------------------------------------
-        | Determine Lead Position
+        | Capacity-Weighted Round Robin
         |--------------------------------------------------------------------------
-        |
-        | Find how many campaign leads exist before this lead.
+        | Select sender with lowest current hourly utilization ratio (reserved / limit)
+        | so senders with larger limits (e.g. 60/hr) receive proportionally more leads
+        | than senders with smaller limits (e.g. 30/hr).
         |
         */
 
-        $leadPosition = CampaignLead::where(
-            'email_campaign_id',
-            $lead->email_campaign_id
-        )
-        ->where('id', '<=', $lead->id)
-        ->count() - 1;
+        return $availableSenders->sortBy(function ($campaignSender) use ($capacityService) {
+            $sender = $campaignSender->sender;
+            $capacityService->checkAndApplyWindowResets($sender);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Round Robin
-        |--------------------------------------------------------------------------
-        */
+            $hourlyLimit = max(1, (int) ($sender->hourly_limit ?? 20));
+            $reservedThisHour = (int) ($sender->reserved_this_hour ?? 0);
 
-        $senderIndex = $leadPosition % $availableSenders->count();
-
-        return $availableSenders->get($senderIndex);
+            return $reservedThisHour / (float) $hourlyLimit;
+        })->first();
     }
 }
