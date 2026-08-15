@@ -303,9 +303,15 @@ class EmailCampaignService
                     }
                 }
 
-                $campaign->update([
+                $updateData = [
                     'total_leads' => CampaignLead::where('email_campaign_id', $campaign->id)->count(),
-                ]);
+                ];
+
+                if ($campaign->status === 'completed' && !empty($newBusinessIds)) {
+                    $updateData['status'] = 'running';
+                }
+
+                $campaign->update($updateData);
             }
 
             /*
@@ -426,25 +432,27 @@ class EmailCampaignService
             */
 
             if (!empty($leadRows)) {
-
                 CampaignLead::insert($leadRows);
-
             }
 
             /*
             |--------------------------------------------------------------------------
-            | Update Campaign Statistics
+            | Update Campaign Statistics & Reactivate if Completed
             |--------------------------------------------------------------------------
             */
 
-            $campaign->update([
-
+            $updateData = [
                 'total_leads' => CampaignLead::where(
                     'email_campaign_id',
                     $campaign->id
                 )->count(),
+            ];
 
-            ]);
+            if ($campaign->status === 'completed' && !empty($leadRows)) {
+                $updateData['status'] = 'running';
+            }
+
+            $campaign->update($updateData);
 
             /*
             |--------------------------------------------------------------------------
