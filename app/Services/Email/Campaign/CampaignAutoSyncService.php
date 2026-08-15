@@ -120,11 +120,20 @@ class CampaignAutoSyncService
             $hasAudit = !empty($business->audit);
 
             switch ($criteria['psi_filter']) {
+                case 'less_30':
+                    if (!$hasAudit || $score <= 0 || $score >= 30) return false;
+                    break;
                 case 'less_50':
                     if (!$hasAudit || $score <= 0 || $score >= 50) return false;
                     break;
+                case 'less_70':
+                    if (!$hasAudit || $score <= 0 || $score >= 70) return false;
+                    break;
                 case 'less_90':
                     if (!$hasAudit || $score <= 0 || $score >= 90) return false;
+                    break;
+                case 'between_50_89':
+                    if (!$hasAudit || $score < 50 || $score >= 90) return false;
                     break;
                 case 'good_90':
                     if (!$hasAudit || $score < 90) return false;

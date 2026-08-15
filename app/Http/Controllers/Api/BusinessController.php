@@ -71,13 +71,25 @@ class BusinessController extends Controller
 
         if ($request->filled('psi_filter')) {
             $filter = $request->psi_filter;
-            if ($filter === 'less_50') {
+            if ($filter === 'less_30') {
+                $query->whereHas('audit', function ($q) {
+                    $q->where('mobile_pagespeed', '>', 0)->where('mobile_pagespeed', '<', 30);
+                });
+            } elseif ($filter === 'less_50') {
                 $query->whereHas('audit', function ($q) {
                     $q->where('mobile_pagespeed', '>', 0)->where('mobile_pagespeed', '<', 50);
+                });
+            } elseif ($filter === 'less_70') {
+                $query->whereHas('audit', function ($q) {
+                    $q->where('mobile_pagespeed', '>', 0)->where('mobile_pagespeed', '<', 70);
                 });
             } elseif ($filter === 'less_90') {
                 $query->whereHas('audit', function ($q) {
                     $q->where('mobile_pagespeed', '>', 0)->where('mobile_pagespeed', '<', 90);
+                });
+            } elseif ($filter === 'between_50_89') {
+                $query->whereHas('audit', function ($q) {
+                    $q->where('mobile_pagespeed', '>=', 50)->where('mobile_pagespeed', '<', 90);
                 });
             } elseif ($filter === 'good_90') {
                 $query->whereHas('audit', function ($q) {
