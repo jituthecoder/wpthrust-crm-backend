@@ -56,10 +56,19 @@ class BusinessImportService
             $data = array_combine($header, $row);
 
             $website = $this->clean($data['Website'] ?? '');
+            if (!empty($website)) {
+                if (str_contains($website, '?')) {
+                    $website = explode('?', $website)[0];
+                }
+                if (str_contains($website, '#')) {
+                    $website = explode('#', $website)[0];
+                }
+                $website = rtrim($website, '/');
+            }
             $phone = $this->clean($data['Phone'] ?? '');
             $email = strtolower($this->clean($data['Email'] ?? '') ?: '');
 
-            $websiteKey = strtolower($website ?? '');
+            $websiteKey = strtolower(preg_replace('~^https?://~i', '', $website ?? ''));
             $emailKey = strtolower($email);
 
             // Duplicate Check against DB and current batch

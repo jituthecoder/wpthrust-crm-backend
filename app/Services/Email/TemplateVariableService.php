@@ -247,6 +247,20 @@ class TemplateVariableService
                 'label' => 'Contact Form',
             ],
 
+            [
+                'group' => 'Performance',
+                'key' => 'psi_analysis_url',
+                'variable' => '{{psi_analysis_url}}',
+                'label' => 'Google PageSpeed Direct Live Analysis URL',
+            ],
+
+            [
+                'group' => 'Performance',
+                'key' => 'pagespeed_analysis_url',
+                'variable' => '{{pagespeed_analysis_url}}',
+                'label' => 'Google PageSpeed Direct Live Analysis URL (Alias)',
+            ],
+
         ];
     }
 
@@ -262,11 +276,22 @@ class TemplateVariableService
         $audit = $business->audit;
         $screenshotUrl = optional($audit)->mobile_screenshot_url;
 
+        // Clean website URL: strip query parameters (?utm_source=...), fragments, and leading protocol
+        $cleanWebsite = $this->cleanWebsiteUrl($business->website);
+        $fullCleanWebsite = !empty($cleanWebsite) ? 'https://' . $cleanWebsite . '/' : '';
+        $psiAnalysisUrl = !empty($fullCleanWebsite) 
+            ? 'https://pagespeed.web.dev/analysis?url=' . urlencode($fullCleanWebsite)
+            : 'https://pagespeed.web.dev/';
+
         $replace = [
 
             '{{business_name}}' => $business->business_name ?? '',
 
-            '{{website}}' => $business->website ?? '',
+            '{{website}}' => $cleanWebsite,
+
+            '{{psi_analysis_url}}' => $psiAnalysisUrl,
+
+            '{{pagespeed_analysis_url}}' => $psiAnalysisUrl,
 
             '{{email}}' => $business->email ?? '',
 
@@ -343,5 +368,32 @@ class TemplateVariableService
             array_values($replace),
             $content
         );
+    }
+
+    /**
+     * Clean raw website URL: remove UTM tracking parameters, fragments, and leading protocol.
+     */
+    public function cleanWebsiteUrl(?string $url): string
+    {
+        if (empty($url)) {
+            return '';
+        }
+
+        $url = trim($url);
+
+        // Remove query parameters (?utm_source=... etc)
+        if (str_contains($url, '?')) {
+            $url = explode('?', $url)[0];
+        }
+
+        // Remove fragment (#...)
+        if (str_contains($url, '#')) {
+            $url = explode('#', $url)[0];
+        }
+
+        // Remove leading protocol
+        $url = preg_replace('~^https?://~i', '', $url);
+
+        return rtrim($url, '/');
     }
 }
