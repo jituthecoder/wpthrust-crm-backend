@@ -14,6 +14,8 @@ class CampaignDeliveryAttempt extends Model
         'attempt_number',
         'idempotency_key',
         'status',
+        'sent_subject',
+        'sent_body_html',
         'provider_message_id',
         'provider_thread_id',
         'failure_reason',

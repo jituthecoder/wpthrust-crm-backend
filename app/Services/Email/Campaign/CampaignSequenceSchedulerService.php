@@ -142,13 +142,13 @@ class CampaignSequenceSchedulerService
     /**
      * Dispatch follow-up email for a specific sequence step.
      */
-    protected function dispatchFollowupEmail(EmailCampaign $campaign, CampaignLead $lead, CampaignSequenceStep $step): bool
+    protected function dispatchFollowupEmail(EmailCampaign $campaign, CampaignLead $lead, CampaignSequenceStep $step): array
     {
         try {
             $template = $step->template;
             if (!$template || !$template->currentVersion) {
                 Log::warning("Sequence Step #{$step->id} has no valid published template");
-                return false;
+                return ['success' => false, 'subject' => null, 'html' => null];
             }
 
             $version = $template->currentVersion;
@@ -157,7 +157,7 @@ class CampaignSequenceSchedulerService
 
             if (!$sender) {
                 Log::warning("Campaign #{$campaign->id} has no active sender for sequence step");
-                return false;
+                return ['success' => false, 'subject' => null, 'html' => null];
             }
 
             // Render subject and body with lead variable replacement
@@ -172,10 +172,14 @@ class CampaignSequenceSchedulerService
                 $trackedHtml
             );
 
-            return $sendResult['success'] ?? false;
+            return [
+                'success' => $sendResult['success'] ?? false,
+                'subject' => $subject,
+                'html' => $rawHtml,
+            ];
         } catch (\Throwable $e) {
             Log::error("Failed to dispatch sequence step #{$step->id} for Lead #{$lead->id}: " . $e->getMessage());
-            return false;
+            return ['success' => false, 'subject' => null, 'html' => null];
         }
     }
 }

@@ -11,6 +11,8 @@ class CampaignLeadStep extends Model
         'campaign_sequence_step_id',
         'step_number',
         'status',
+        'sent_subject',
+        'sent_body_html',
         'scheduled_at',
         'sent_at',
     ];

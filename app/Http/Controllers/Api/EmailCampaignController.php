@@ -264,6 +264,8 @@ class EmailCampaignController extends Controller
 
                 'leads.business',
 
+                'leads.stepExecutions',
+
             ])
 
         ]);

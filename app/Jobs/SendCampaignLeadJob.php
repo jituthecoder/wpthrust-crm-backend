@@ -348,6 +348,8 @@ class SendCampaignLeadJob implements ShouldQueue
             $attempt->update([
                 'status' => 'sent',
                 'completed_at' => now(),
+                'sent_subject' => $subject,
+                'sent_body_html' => $html,
                 'provider_message_id' => $result->providerMessageId,
                 'provider_thread_id' => $result->providerThreadId,
             ]);
@@ -356,6 +358,8 @@ class SendCampaignLeadJob implements ShouldQueue
                 'status' => 'sent',
                 'email_sender_id' => $sender->id,
                 'email_template_version_id' => $version->id,
+                'sent_subject' => $subject,
+                'sent_body_html' => $html,
                 'provider_message_id' => $result->providerMessageId,
                 'provider_thread_id' => $result->providerThreadId,
                 'sent_at' => now(),

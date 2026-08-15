@@ -30,6 +30,10 @@ class CampaignLead extends Model
 
         'status',
 
+        'sent_subject',
+
+        'sent_body_html',
+
         /*
         |--------------------------------------------------------------------------
         | Retry
@@ -187,6 +191,17 @@ class CampaignLead extends Model
     {
         return $this->hasMany(
             CampaignDeliveryAttempt::class,
+            'campaign_lead_id'
+        );
+    }
+
+    /**
+     * Sequence Step Executions
+     */
+    public function stepExecutions()
+    {
+        return $this->hasMany(
+            CampaignLeadStep::class,
             'campaign_lead_id'
         );
     }
