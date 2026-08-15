@@ -18,7 +18,11 @@ class ProcessPsiBatchCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'psi:process {--concurrency=15 : Number of parallel Google API requests} {--limit=0 : Max number of leads to process (0 for unlimited)}';
+    protected $signature = 'psi:process 
+                            {--concurrency=15 : Number of parallel Google API requests} 
+                            {--limit=0 : Max number of leads to process (0 for unlimited)}
+                            {--reset-missing : Reset audits with missing screenshot files back to pending}
+                            {--reset-all : Reset ALL audits back to pending to re-audit everything}';
 
     /**
      * The console command description.
@@ -37,6 +41,21 @@ class ProcessPsiBatchCommand extends Command
 
         $limit = (int) $this->option('limit');
         $processedTotal = 0;
+
+        if ($this->option('reset-all')) {
+            $resetCount = BusinessAudit::query()->update(['psi_status' => 'pending']);
+            $this->info("Reset ALL {$resetCount} audits back to pending.");
+        } elseif ($this->option('reset-missing')) {
+            $audits = BusinessAudit::whereNotNull('mobile_screenshot_path')->get();
+            $resetCount = 0;
+            foreach ($audits as $audit) {
+                if (!Storage::disk('public')->exists($audit->mobile_screenshot_path)) {
+                    $audit->update(['psi_status' => 'pending']);
+                    $resetCount++;
+                }
+            }
+            $this->info("Reset {$resetCount} audits with missing screenshot files back to pending.");
+        }
 
         $this->info("Starting High-Speed Parallel PageSpeed Processor (Concurrency: {$concurrency})...");
 
