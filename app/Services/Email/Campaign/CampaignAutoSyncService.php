@@ -46,7 +46,7 @@ class CampaignAutoSyncService
                     $campaign->update(['status' => 'running']);
                 }
 
-                // Attach business as a pending lead scheduled for immediate dispatch
+                // Attach business as a pending lead scheduled for delivery via CampaignDeliverySchedulerService
                 $lead = CampaignLead::create([
                     'email_campaign_id' => $campaign->id,
                     'business_id' => $business->id,
@@ -56,15 +56,6 @@ class CampaignAutoSyncService
 
                 $campaign->increment('total_leads');
                 $attachedCount++;
-
-                // Dispatch email job immediately if campaign is running
-                if ($campaign->status === 'running') {
-                    try {
-                        \App\Jobs\SendCampaignLeadJob::dispatch($lead);
-                    } catch (\Throwable $e) {
-                        Log::warning("Failed to dispatch auto-synced lead #{$lead->id}: " . $e->getMessage());
-                    }
-                }
 
                 Log::info("Auto-synced Lead #{$business->id} ({$business->email}) to Campaign #{$campaign->id} ({$campaign->name})");
             }
@@ -100,7 +91,7 @@ class CampaignAutoSyncService
         foreach ($candidateLeads as $business) {
             if ($this->matchesCriteria($business, $criteria)) {
 
-                // Attach business as pending lead
+                // Attach business as pending lead scheduled for delivery via CampaignDeliverySchedulerService
                 $lead = CampaignLead::create([
                     'email_campaign_id' => $campaign->id,
                     'business_id' => $business->id,
@@ -110,15 +101,6 @@ class CampaignAutoSyncService
 
                 $campaign->increment('total_leads');
                 $attachedCount++;
-
-                // Dispatch email job immediately if campaign is running
-                if ($campaign->status === 'running') {
-                    try {
-                        \App\Jobs\SendCampaignLeadJob::dispatch($lead->id);
-                    } catch (\Throwable $e) {
-                        Log::warning("Failed to dispatch auto-synced lead #{$lead->id}: " . $e->getMessage());
-                    }
-                }
 
                 Log::info("Manual/Auto-synced Lead #{$business->id} ({$business->email}) to Campaign #{$campaign->id} ({$campaign->name})");
             }
