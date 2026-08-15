@@ -45,6 +45,7 @@ class BusinessImportService
         $existingEmails = array_flip(array_filter(Business::whereNotNull('email')->where('email', '!=', '')->pluck('email')->map(fn($e) => strtolower(trim($e)))->toArray()));
 
         $psiJobs = [];
+        $importedBusinessIds = [];
 
         while (($row = fgetcsv($handle, 0, ',')) !== false) {
 
@@ -98,6 +99,8 @@ class BusinessImportService
 
                 DB::commit();
 
+                $importedBusinessIds[] = $business->id;
+
                 // Track in-memory so duplicates inside the same CSV are also skipped
                 if (!empty($websiteKey)) $existingWebsites[$websiteKey] = true;
                 if (!empty($phone)) $existingPhones[$phone] = true;
@@ -122,6 +125,73 @@ class BusinessImportService
         }
 
         fclose($handle);
+
+        // Auto-sync newly imported leads to active campaigns matching criteria
+        if (!empty($importedBusinessIds)) {
+            $campaignService = app(\App\Services\Email\EmailCampaignService::class);
+            $autoCampaigns = \App\Models\EmailCampaign::where('auto_sync_enabled', true)
+                ->whereIn('status', ['running', 'scheduled', 'draft'])
+                ->get();
+
+            foreach ($autoCampaigns as $campaign) {
+                $criteria = $campaign->auto_sync_criteria ?? [];
+                if (!is_array($criteria)) continue;
+
+                $query = Business::whereIn('id', $importedBusinessIds)->whereNotNull('email');
+
+                if (!empty($criteria['has_website'])) {
+                    if ($criteria['has_website'] === 'yes') {
+                        $query->whereNotNull('website')->where('website', '!=', '')->where('website', '!=', '-');
+                    } elseif ($criteria['has_website'] === 'no') {
+                        $query->where(function($q) {
+                            $q->whereNull('website')->orWhere('website', '')->orWhere('website', '-');
+                        });
+                    }
+                }
+
+                if (!empty($criteria['category'])) {
+                    $query->where('category', 'LIKE', "%{$criteria['category']}%");
+                }
+
+                if (!empty($criteria['country'])) {
+                    $query->where('country', 'LIKE', "%{$criteria['country']}%");
+                }
+
+                if (!empty($criteria['has_screenshot'])) {
+                    if ($criteria['has_screenshot'] === 'yes') {
+                        $query->whereHas('audit', function($q) {
+                            $q->whereNotNull('mobile_screenshot_path')->where('mobile_screenshot_path', '!=', '');
+                        });
+                    }
+                }
+
+                if (!empty($criteria['psi_filter'])) {
+                    $filter = $criteria['psi_filter'];
+                    if ($filter === 'less_50') {
+                        $query->whereHas('audit', function ($q) {
+                            $q->where('mobile_pagespeed', '>', 0)->where('mobile_pagespeed', '<', 50);
+                        });
+                    } elseif ($filter === 'less_90') {
+                        $query->whereHas('audit', function ($q) {
+                            $q->where('mobile_pagespeed', '>', 0)->where('mobile_pagespeed', '<', 90);
+                        });
+                    } elseif ($filter === 'good_90') {
+                        $query->whereHas('audit', function ($q) {
+                            $q->where('mobile_pagespeed', '>=', 90);
+                        });
+                    }
+                }
+
+                $matchingIds = $query->pluck('id')->toArray();
+                if (!empty($matchingIds)) {
+                    try {
+                        $campaignService->assignLeads($campaign, $matchingIds);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning("Auto sync error for campaign #{$campaign->id}: " . $e->getMessage());
+                    }
+                }
+            }
+        }
 
         // Dispatch PSI Jobs
         foreach ($psiJobs as $b) {
