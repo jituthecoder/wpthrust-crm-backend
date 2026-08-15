@@ -34,28 +34,30 @@ class ReauditMissingScreenshotsCommand extends Command
 
         $dispatched = 0;
 
-        Business::whereNotNull('website')
-            ->where('website', '!=', '')
-            ->where('website', '!=', '-')
-            ->select('id', 'website')
-            ->chunk(500, function ($businesses) use ($force, &$dispatched) {
-                foreach ($businesses as $business) {
-                    $audit = $business->audit;
+        if ($force) {
+            $businesses = Business::whereNotNull('website')
+                ->where('website', '!=', '')
+                ->where('website', '!=', '-')
+                ->select('id')
+                ->get();
+        } else {
+            $businesses = Business::whereNotNull('website')
+                ->where('website', '!=', '')
+                ->where('website', '!=', '-')
+                ->where(function ($q) {
+                    $q->whereDoesntHave('audit')
+                      ->orWhereHas('audit', function ($sq) {
+                          $sq->whereNull('mobile_screenshot_path')->orWhere('mobile_screenshot_path', '');
+                      });
+                })
+                ->select('id')
+                ->get();
+        }
 
-                    $missing = false;
-
-                    if (!$audit || $force || empty($audit->mobile_screenshot_path)) {
-                        $missing = true;
-                    } elseif (!Storage::disk('public')->exists($audit->mobile_screenshot_path)) {
-                        $missing = true;
-                    }
-
-                    if ($missing) {
-                        FetchBusinessPsiJob::dispatch($business);
-                        $dispatched++;
-                    }
-                }
-            });
+        foreach ($businesses as $business) {
+            FetchBusinessPsiJob::dispatch($business);
+            $dispatched++;
+        }
 
         $this->info("Successfully queued {$dispatched} business leads for PageSpeed re-audit and screenshot generation.");
 
