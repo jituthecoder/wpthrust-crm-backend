@@ -89,6 +89,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/businesses', [BusinessController::class, 'index']);
         Route::get('/businesses/categories', [BusinessController::class, 'categories']);
+        Route::get('/businesses/countries', [BusinessController::class, 'countries']);
         Route::get('/businesses/{business}', [BusinessController::class, 'show']);
 
         Route::post('/businesses/{business}/fetch-psi', [BusinessController::class, 'fetchPsi']);

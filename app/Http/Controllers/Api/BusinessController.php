@@ -55,6 +55,16 @@ class BusinessController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Country Filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('country')) {
+            $query->where('country', 'LIKE', "%{$request->country}%");
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | PageSpeed Score Filter (PSI)
         |--------------------------------------------------------------------------
         */
@@ -190,6 +200,21 @@ class BusinessController extends Controller
         return response()->json([
             'success' => true,
             'data' => $categories,
+        ]);
+    }
+
+    public function countries()
+    {
+        $countries = Business::whereNotNull('country')
+            ->where('country', '!=', '')
+            ->where('country', '!=', '-')
+            ->distinct()
+            ->orderBy('country')
+            ->pluck('country');
+
+        return response()->json([
+            'success' => true,
+            'data' => $countries,
         ]);
     }
 
