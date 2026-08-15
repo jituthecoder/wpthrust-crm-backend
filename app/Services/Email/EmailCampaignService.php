@@ -956,6 +956,32 @@ class EmailCampaignService
     }
 
     /**
+     * Retry Single Failed Campaign Lead
+     */
+    public function retryLead(
+        EmailCampaign $campaign,
+        CampaignLead $lead
+    ): CampaignLead {
+        if ($lead->email_campaign_id !== $campaign->id) {
+            throw new \Exception('Campaign lead does not belong to specified campaign.');
+        }
+
+        $lead->update([
+            'status' => 'pending',
+            'failure_reason' => null,
+            'processing_started_at' => null,
+            'last_attempt_at' => null,
+            'scheduled_at' => now(),
+        ]);
+
+        if (in_array($campaign->status, ['completed', 'paused', 'draft'])) {
+            $campaign->update(['status' => 'running']);
+        }
+
+        return $lead->fresh();
+    }
+
+    /**
      * Delete Campaign
      */
     public function delete(
