@@ -32,36 +32,30 @@ class ReauditMissingScreenshotsCommand extends Command
         $force = $this->option('force');
         $this->info('Scanning businesses for missing PageSpeed audits or missing screenshot files...');
 
-        $query = Business::whereNotNull('website')
-            ->where('website', '!=', '')
-            ->where('website', '!=', '-');
-
-        $businesses = $query->get();
         $dispatched = 0;
 
-        foreach ($businesses as $business) {
-            $audit = $business->audit;
+        Business::whereNotNull('website')
+            ->where('website', '!=', '')
+            ->where('website', '!=', '-')
+            ->select('id', 'website')
+            ->chunk(500, function ($businesses) use ($force, &$dispatched) {
+                foreach ($businesses as $business) {
+                    $audit = $business->audit;
 
-            $missing = false;
+                    $missing = false;
 
-            if (!$audit) {
-                $missing = true;
-            } elseif ($force) {
-                $missing = true;
-            } elseif (empty($audit->mobile_screenshot_path)) {
-                $missing = true;
-            } else {
-                // Check if physical file exists on public storage disk
-                if (!Storage::disk('public')->exists($audit->mobile_screenshot_path)) {
-                    $missing = true;
+                    if (!$audit || $force || empty($audit->mobile_screenshot_path)) {
+                        $missing = true;
+                    } elseif (!Storage::disk('public')->exists($audit->mobile_screenshot_path)) {
+                        $missing = true;
+                    }
+
+                    if ($missing) {
+                        FetchBusinessPsiJob::dispatch($business);
+                        $dispatched++;
+                    }
                 }
-            }
-
-            if ($missing) {
-                FetchBusinessPsiJob::dispatch($business);
-                $dispatched++;
-            }
-        }
+            });
 
         $this->info("Successfully queued {$dispatched} business leads for PageSpeed re-audit and screenshot generation.");
 
