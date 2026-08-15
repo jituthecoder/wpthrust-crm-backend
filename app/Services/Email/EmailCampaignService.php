@@ -454,6 +454,11 @@ class EmailCampaignService
 
             $campaign->update($updateData);
 
+            // Sync all matching existing leads from DB if auto-sync is enabled
+            if ($campaign->auto_sync_enabled) {
+                app(\App\Services\Email\Campaign\CampaignAutoSyncService::class)->syncAllMatchingLeads($campaign);
+            }
+
             /*
             |--------------------------------------------------------------------------
             | Return Updated Campaign

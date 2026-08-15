@@ -428,6 +428,27 @@ class EmailCampaignController extends Controller
     }
 
     /**
+     * Trigger Manual Sync of Matching Leads for Campaign
+     */
+    public function syncLeads(
+        EmailCampaign $emailCampaign
+    ) {
+        $this->authorizeTenant($emailCampaign);
+
+        $autoSyncService = app(\App\Services\Email\Campaign\CampaignAutoSyncService::class);
+        $addedCount = $autoSyncService->syncAllMatchingLeads($emailCampaign);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Synced {$addedCount} matching leads to campaign successfully.",
+            'data' => [
+                'added_count' => $addedCount,
+                'total_leads' => $emailCampaign->fresh()->leads()->count(),
+            ],
+        ]);
+    }
+
+    /**
      * Delete Campaign
      */
     public function destroy(

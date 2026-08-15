@@ -242,6 +242,11 @@ Route::middleware('auth:sanctum')->group(function () {
         );
 
         Route::post(
+            'email-campaigns/{emailCampaign}/sync-leads',
+            [EmailCampaignController::class, 'syncLeads']
+        );
+
+        Route::post(
             'email-campaigns/{emailCampaign}/leads/{campaignLead}/retry',
             [EmailCampaignController::class, 'retryLead']
         );

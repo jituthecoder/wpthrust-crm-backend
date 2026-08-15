@@ -74,6 +74,64 @@ class CampaignAutoSyncService
     }
 
     /**
+     * Scan database and auto-attach ALL existing matching leads to a specific campaign.
+     */
+    public function syncAllMatchingLeads(EmailCampaign $campaign): int
+    {
+        if (!$campaign->auto_sync_enabled) {
+            return 0;
+        }
+
+        $criteria = $campaign->auto_sync_criteria ?? [];
+        $attachedCount = 0;
+
+        // Fetch candidate businesses with emails that are not already attached
+        $existingBusinessIds = CampaignLead::where('email_campaign_id', $campaign->id)
+            ->pluck('business_id')
+            ->toArray();
+
+        $query = Business::whereNotNull('email')
+            ->where('email', '!=', '')
+            ->whereNotIn('id', $existingBusinessIds)
+            ->with('audit');
+
+        $candidateLeads = $query->get();
+
+        foreach ($candidateLeads as $business) {
+            if ($this->matchesCriteria($business, $criteria)) {
+
+                // Attach business as pending lead
+                $lead = CampaignLead::create([
+                    'email_campaign_id' => $campaign->id,
+                    'business_id' => $business->id,
+                    'status' => 'pending',
+                    'scheduled_at' => now(),
+                ]);
+
+                $campaign->increment('total_leads');
+                $attachedCount++;
+
+                // Dispatch email job immediately if campaign is running
+                if ($campaign->status === 'running') {
+                    try {
+                        \App\Jobs\SendCampaignLeadJob::dispatch($lead->id);
+                    } catch (\Throwable $e) {
+                        Log::warning("Failed to dispatch auto-synced lead #{$lead->id}: " . $e->getMessage());
+                    }
+                }
+
+                Log::info("Manual/Auto-synced Lead #{$business->id} ({$business->email}) to Campaign #{$campaign->id} ({$campaign->name})");
+            }
+        }
+
+        if ($attachedCount > 0 && $campaign->status === 'completed') {
+            $campaign->update(['status' => 'running']);
+        }
+
+        return $attachedCount;
+    }
+
+    /**
      * Check if a business lead satisfies the campaign's auto-sync filter criteria.
      */
     public function matchesCriteria(Business $business, array $criteria): bool
@@ -105,11 +163,11 @@ class CampaignAutoSyncService
             }
         }
 
-        // 4. Country Substring Check
+        // 4. Country Substring & Alias Check
         if (!empty($criteria['country'])) {
             $country = strtolower(trim($business->country ?? ''));
             $targetCountry = strtolower(trim($criteria['country']));
-            if (!str_contains($country, $targetCountry)) {
+            if (!$this->matchCountryAlias($country, $targetCountry)) {
                 return false;
             }
         }
@@ -145,5 +203,30 @@ class CampaignAutoSyncService
         }
 
         return true;
+    }
+
+    /**
+     * Smart Country Alias Matching (supports USA, US, United States, United State, etc.)
+     */
+    protected function matchCountryAlias(string $leadCountry, string $targetCountry): bool
+    {
+        if (empty($targetCountry)) return true;
+        if (empty($leadCountry)) return false;
+
+        if (str_contains($leadCountry, $targetCountry) || str_contains($targetCountry, $leadCountry)) {
+            return true;
+        }
+
+        $usAliases = ['us', 'usa', 'united states', 'united state', 'united states of america', 'u.s.', 'u.s.a.'];
+        if (in_array($targetCountry, $usAliases) && in_array($leadCountry, $usAliases)) {
+            return true;
+        }
+
+        $ukAliases = ['uk', 'united kingdom', 'great britain', 'england', 'u.k.'];
+        if (in_array($targetCountry, $ukAliases) && in_array($leadCountry, $ukAliases)) {
+            return true;
+        }
+
+        return false;
     }
 }
