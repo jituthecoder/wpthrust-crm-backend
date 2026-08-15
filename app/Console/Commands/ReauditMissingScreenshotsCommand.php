@@ -7,6 +7,7 @@ use App\Models\BusinessAudit;
 use App\Jobs\FetchBusinessPsiJob;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 
 class ReauditMissingScreenshotsCommand extends Command
 {
