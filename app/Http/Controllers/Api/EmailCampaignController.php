@@ -305,7 +305,7 @@ class EmailCampaignController extends Controller
 
             'status' => [
                 'nullable',
-                'in:pending,processing,sent,failed',
+                'in:pending,processing,sent,failed,unsubscribed',
             ],
 
             'search' => [

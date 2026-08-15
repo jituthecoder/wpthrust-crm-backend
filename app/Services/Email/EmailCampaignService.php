@@ -624,9 +624,13 @@ class EmailCampaignService
 
         $openedCount = $campaign->leads()->whereNotNull('opened_at')->count();
         $clickedCount = $campaign->leads()->whereNotNull('clicked_at')->count();
+        $unsubscribedCount = $campaign->leads()->where(function($q) {
+            $q->where('status', 'unsubscribed')->orWhereNotNull('unsubscribed_at');
+        })->count();
 
         $openRate = $sent > 0 ? round(($openedCount / $sent) * 100, 1) : 0.0;
         $clickRate = $sent > 0 ? round(($clickedCount / $sent) * 100, 1) : 0.0;
+        $unsubscribeRate = $sent > 0 ? round(($unsubscribedCount / $sent) * 100, 1) : 0.0;
 
         return [
 
@@ -643,6 +647,10 @@ class EmailCampaignService
             'sent' => $sent,
 
             'failed' => $failed,
+
+            'unsubscribed' => $unsubscribedCount,
+
+            'unsubscribe_rate' => $unsubscribeRate,
 
             'processed' => $processed,
 
