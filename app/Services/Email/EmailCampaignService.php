@@ -244,72 +244,69 @@ class EmailCampaignService
 
             /*
             |--------------------------------------------------------------------------
-            | Remove Old Relations
+            | Update Senders
             |--------------------------------------------------------------------------
             */
 
-            CampaignSender::where(
-                'email_campaign_id',
-                $campaign->id
-            )->delete();
-
-            CampaignLead::where(
-                'email_campaign_id',
-                $campaign->id
-            )->delete();
-
-            /*
-            |--------------------------------------------------------------------------
-            | Add Senders
-            |--------------------------------------------------------------------------
-            */
-
-            $senderRows = [];
-
-            foreach ($data['senders'] as $senderId) {
-
-                $senderRows[] = [
-
-                    'email_campaign_id' => $campaign->id,
-
-                    'email_sender_id' => $senderId,
-
-                    'priority' => 1,
-
-                    'weight' => 1,
-
-                    'daily_limit' => null,
-
-                    'hourly_limit' => null,
-
-                    'is_active' => true,
-
-                    'created_at' => now(),
-
-                    'updated_at' => now(),
-
-                ];
-            }
-
-            if (!empty($senderRows)) {
-
-                CampaignSender::insert($senderRows);
-
+            if (isset($data['senders']) && is_array($data['senders'])) {
+                CampaignSender::where('email_campaign_id', $campaign->id)->delete();
+                $senderRows = [];
+                foreach ($data['senders'] as $senderId) {
+                    $senderRows[] = [
+                        'email_campaign_id' => $campaign->id,
+                        'email_sender_id' => $senderId,
+                        'priority' => 1,
+                        'weight' => 1,
+                        'daily_limit' => null,
+                        'hourly_limit' => null,
+                        'is_active' => true,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+                if (!empty($senderRows)) {
+                    CampaignSender::insert($senderRows);
+                }
             }
 
             /*
             |--------------------------------------------------------------------------
-            | Get Businesses With Email
+            | Add New Businesses If Provided (Preserving Existing Leads & Stats)
             |--------------------------------------------------------------------------
             */
 
-            $businesses = Business::whereIn(
-                'id',
-                $data['businesses']
-            )
-                ->whereNotNull('email')
-                ->where('email', '!=', '')
-                ->get();
+            if (!empty($data['businesses']) && is_array($data['businesses'])) {
+                $existingBusinessIds = CampaignLead::where('email_campaign_id', $campaign->id)
+                    ->pluck('business_id')
+                    ->toArray();
+
+                $newBusinessIds = array_diff($data['businesses'], $existingBusinessIds);
+
+                if (!empty($newBusinessIds)) {
+                    $businesses = Business::whereIn('id', $newBusinessIds)
+                        ->whereNotNull('email')
+                        ->where('email', '!=', '')
+                        ->get();
+
+                    $leadRows = [];
+                    foreach ($businesses as $business) {
+                        $leadRows[] = [
+                            'email_campaign_id' => $campaign->id,
+                            'business_id' => $business->id,
+                            'status' => 'pending',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ];
+                    }
+                    if (!empty($leadRows)) {
+                        CampaignLead::insert($leadRows);
+                    }
+                }
+
+                $campaign->update([
+                    'total_leads' => CampaignLead::where('email_campaign_id', $campaign->id)->count(),
+                ]);
+            }
 
             /*
             |--------------------------------------------------------------------------
@@ -319,59 +316,17 @@ class EmailCampaignService
 
             $leadRows = [];
 
-            foreach ($businesses as $business) {
-
-                $leadRows[] = [
-
-                    'email_campaign_id' => $campaign->id,
-
-                    'business_id' => $business->id,
-
-                    'email_template_version_id' => null,
-
-                    'status' => 'pending',
-
-                    'created_at' => now(),
-
-                    'updated_at' => now(),
-
-                ];
-            }
-
-            if (!empty($leadRows)) {
-
-                CampaignLead::insert($leadRows);
-
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Update Statistics
-            |--------------------------------------------------------------------------
-            */
-
-            $campaign->update([
-
-                'total_leads' => $businesses->count(),
-
-            ]);
-
             /*
             |--------------------------------------------------------------------------
             | Return Campaign
             |--------------------------------------------------------------------------
             */
 
-            return $campaign->load([
-
+            return $campaign->fresh()->load([
                 'template',
-
                 'creator',
-
                 'senders.sender',
-
                 'leads.business',
-
             ]);
         });
     }
