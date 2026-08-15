@@ -121,15 +121,10 @@ class SendCampaignLeadJob implements ShouldQueue
         $sender = $lead->sender;
 
         if (!$sender && $lead->campaign) {
-            $campaignSenderPivot = $lead->campaign->senders()
-                ->with('sender')
-                ->whereHas('sender', function ($query) {
-                    $query->where('is_active', true);
-                })
-                ->first();
-
-            if ($campaignSenderPivot) {
-                $sender = $campaignSenderPivot->sender;
+            $senderSelector = app(\App\Services\Email\Campaign\EmailSenderSelectorService::class);
+            $selectedCampaignSender = $senderSelector->select($lead);
+            if ($selectedCampaignSender) {
+                $sender = $selectedCampaignSender->sender;
             }
         }
 

@@ -25,16 +25,43 @@ class CampaignDeliverySchedulerService
                     return false;
                 }
 
+                // Calculate cumulative hourly limit across all active senders for this campaign
+                $sendersPivots = $campaign->senders()
+                    ->with('sender')
+                    ->whereHas('sender', function ($query) {
+                        $query->where('is_active', true);
+                    })
+                    ->get();
+
+                $activeSendersCount = $sendersPivots->count();
+
+                // If senders exist, calculate spacing interval so emails are spread evenly across the hour
+                $totalHourlyCapacity = $sendersPivots->sum(function ($cs) {
+                    return (int) ($cs->sender->hourly_limit ?? 20);
+                });
+
+                // Default interval: 3600 / totalHourlyCapacity (e.g. 3600 / 40 = 90 seconds spacing)
+                $baseIntervalSeconds = ($totalHourlyCapacity > 0)
+                    ? (int) max(15, floor(3600.0 / (float) $totalHourlyCapacity))
+                    : 90;
+
+                $batchIndex = 0;
+
                 $campaign->leads()
                     ->due()
-                    ->chunkById($chunkSize, function ($leads) use (&$dispatchedCount, $maxBatch) {
+                    ->chunkById($chunkSize, function ($leads) use (&$dispatchedCount, $maxBatch, $baseIntervalSeconds, &$batchIndex) {
                         foreach ($leads as $lead) {
                             if ($dispatchedCount >= $maxBatch) {
                                 return false;
                             }
 
-                            if ($this->claimAndDispatch($lead->id)) {
+                            // Add subtle +/- 10s random jitter for natural human-like variation
+                            $staggerSeconds = ($batchIndex * $baseIntervalSeconds) + rand(-10, 10);
+                            if ($staggerSeconds < 0) $staggerSeconds = 0;
+
+                            if ($this->claimAndDispatch($lead->id, $staggerSeconds)) {
                                 $dispatchedCount++;
+                                $batchIndex++;
                             }
                         }
                     });
@@ -44,13 +71,11 @@ class CampaignDeliverySchedulerService
     }
 
     /**
-     * Atomically claim a due campaign lead and dispatch SendCampaignLeadJob.
-     *
-     * Prevents duplicate dispatches if multiple scheduler instances or workers execute concurrently.
+     * Atomically claim a due campaign lead and dispatch SendCampaignLeadJob with optional pacing delay.
      */
-    public function claimAndDispatch(int $leadId): bool
+    public function claimAndDispatch(int $leadId, int $staggerSeconds = 0): bool
     {
-        return DB::transaction(function () use ($leadId) {
+        return DB::transaction(function () use ($leadId, $staggerSeconds) {
             $lead = CampaignLead::where('id', $leadId)
                 ->due()
                 ->lockForUpdate()
@@ -72,7 +97,13 @@ class CampaignDeliverySchedulerService
                 'last_attempt_at' => now(),
             ]);
 
-            SendCampaignLeadJob::dispatch($lead->id)->onQueue('emails')->afterCommit();
+            $job = SendCampaignLeadJob::dispatch($lead->id)->onQueue('emails');
+
+            if ($staggerSeconds > 0) {
+                $job->delay(now()->addSeconds($staggerSeconds));
+            }
+
+            $job->afterCommit();
 
             return true;
         });
