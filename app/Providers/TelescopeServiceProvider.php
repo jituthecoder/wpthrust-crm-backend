@@ -20,7 +20,7 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
         $this->hideSensitiveRequestDetails();
 
         $isLocal = $this->app->environment('local');
-        $recordAll = env('TELESCOPE_RECORD_ALL', true);
+        $recordAll = config('telescope.record_all', env('TELESCOPE_RECORD_ALL', true));
 
         Telescope::filter(function (IncomingEntry $entry) use ($isLocal, $recordAll) {
             return $isLocal ||
@@ -59,7 +59,10 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
     protected function gate(): void
     {
         Gate::define('viewTelescope', function ($user = null) {
-            if ($this->app->environment('local') || env('TELESCOPE_ALLOW_ALL', false)) {
+            if (
+                $this->app->environment('local') ||
+                config('telescope.allow_all', env('TELESCOPE_ALLOW_ALL', true))
+            ) {
                 return true;
             }
 

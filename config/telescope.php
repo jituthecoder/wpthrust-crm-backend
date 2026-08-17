@@ -18,6 +18,10 @@ return [
 
     'enabled' => env('TELESCOPE_ENABLED', true),
 
+    'allow_all' => env('TELESCOPE_ALLOW_ALL', true),
+
+    'record_all' => env('TELESCOPE_RECORD_ALL', true),
+
     /*
     |--------------------------------------------------------------------------
     | Telescope Domain
