@@ -106,6 +106,46 @@ class LeadController extends Controller
             $query->where('category', 'LIKE', "%{$request->category}%");
         }
 
+        // Location Filter
+        if ($request->filled('location')) {
+            $location = trim($request->location);
+            $query->where(function ($q) use ($location) {
+                $q->where('city', 'LIKE', "%{$location}%")
+                  ->orWhere('state', 'LIKE', "%{$location}%")
+                  ->orWhere('country', 'LIKE', "%{$location}%")
+                  ->orWhere('address', 'LIKE', "%{$location}%")
+                  ->orWhere('zip_code', 'LIKE', "%{$location}%");
+            });
+        }
+
+        // Lead Created Date Filter
+        if ($request->filled('created_at')) {
+            $query->whereDate('created_at', $request->created_at);
+        }
+        if ($request->filled('created_from')) {
+            $query->whereDate('created_at', '>=', $request->created_from);
+        }
+        if ($request->filled('created_to')) {
+            $query->whereDate('created_at', '<=', $request->created_to);
+        }
+
+        // Has Website Filter
+        if ($request->filled('has_website')) {
+            if ($request->has_website === 'yes') {
+                $query->whereNotNull('website')
+                      ->where('website', '!=', '')
+                      ->where('website', '!=', '-')
+                      ->whereRaw('LOWER(website) != ?', ['n/a']);
+            } elseif ($request->has_website === 'no') {
+                $query->where(function ($q) {
+                    $q->whereNull('website')
+                      ->orWhere('website', '')
+                      ->orWhere('website', '-')
+                      ->orWhereRaw('LOWER(website) = ?', ['n/a']);
+                });
+            }
+        }
+
         /*
         |--------------------------------------------------------------------------
         | Assigned User Filter (Bulletproof for Super Admin & Sales Execs)
