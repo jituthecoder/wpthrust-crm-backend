@@ -16,6 +16,7 @@ class Business extends Model
         'phone',
         'email',
         'website',
+        'domain',
         'address',
         'city',
         'state',

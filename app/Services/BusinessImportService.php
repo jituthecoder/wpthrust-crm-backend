@@ -81,6 +81,12 @@ class BusinessImportService
                 continue;
             }
 
+            $domain = null;
+            if (!empty($website)) {
+                $cleanedUrl = preg_replace('~^https?://~i', '', $website);
+                $domain = strtolower(trim(rtrim(explode('/', explode('?', explode('#', $cleanedUrl)[0])[0])[0], '/')));
+            }
+
             try {
 
                 DB::beginTransaction();
@@ -91,6 +97,7 @@ class BusinessImportService
                     'phone' => $phone,
                     'email' => $email,
                     'website' => $website,
+                    'domain' => $domain,
                     'address' => $this->clean($data['Address'] ?? null),
                     'city' => $this->clean($data['City'] ?? null),
                     'state' => $this->clean($data['State'] ?? null),
