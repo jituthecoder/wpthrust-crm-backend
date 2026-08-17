@@ -28,7 +28,10 @@ class GooglePsiService
             $website = 'https://' . $website;
         }
 
-        $apiKeysConfig = env('PAGESPEED_API_KEYS') ?: config('services.google.pagespeed_api_key') ?: env('PAGESPEED_API_KEY');
+        $apiKeysConfig = config('services.google.pagespeed_api_keys')
+            ?: config('services.google.pagespeed_api_key')
+            ?: env('PAGESPEED_API_KEYS')
+            ?: env('PAGESPEED_API_KEY');
         $apiKeys = array_values(array_filter(array_map('trim', explode(',', $apiKeysConfig ?? ''))));
         $apiKey = !empty($apiKeys) ? $apiKeys[array_rand($apiKeys)] : null;
 
