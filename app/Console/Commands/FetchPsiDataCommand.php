@@ -47,17 +47,22 @@ class FetchPsiDataCommand extends Command
             return self::SUCCESS;
         }
 
-        // Query businesses that have websites and either no audit or pending/failed psi_status
+        // Query businesses that have valid websites and either no audit or pending psi_status (EXCLUDING failed and completed audits)
         $query = Business::query()
             ->whereNotNull('website')
             ->where('website', '!=', '')
+            ->where('website', '!=', '-')
+            ->whereRaw('LOWER(website) != ?', ['n/a'])
             ->where(function ($q) {
                 $q->whereDoesntHave('audit')
                   ->orWhereHas('audit', function ($auditQuery) {
-                      $auditQuery->whereIn('psi_status', ['pending', 'failed'])
-                                 ->orWhereNull('psi_fetched_at');
+                      $auditQuery->where(function ($sub) {
+                          $sub->where('psi_status', 'pending')
+                              ->orWhereNull('psi_status');
+                      })->whereNull('psi_fetched_at');
                   });
             })
+            ->orderBy('id', 'asc')
             ->limit($limit);
 
         $businesses = $query->get();
