@@ -138,6 +138,8 @@ class EmailSenderController extends Controller
 
             'name' => 'required|string|max:255',
 
+            'display_name' => 'nullable|string|max:255',
+
             'email' => 'required|email|unique:email_senders,email,' . $emailSender->id,
 
             'provider' => 'required|string',
@@ -148,7 +150,7 @@ class EmailSenderController extends Controller
 
             'signature' => 'nullable|string',
 
-            'settings' => 'required|array',
+            'settings' => 'nullable|array',
 
         ]);
 

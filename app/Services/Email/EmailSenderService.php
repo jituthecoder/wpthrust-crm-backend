@@ -79,7 +79,7 @@ class EmailSenderService
 
                 'name' => $data['name'],
 
-                'display_name' => $data['display_name'],
+                'display_name' => $data['display_name'] ?? $sender->display_name ?? $data['name'],
 
                 'email' => $data['email'],
 
@@ -94,13 +94,12 @@ class EmailSenderService
             ]);
 
             $existingSettings = $sender->senderAccount?->settings ?? [];
-            $newSettings = array_merge($existingSettings, $data['settings'] ?? []);
+            $newSettings = !empty($data['settings']) ? array_merge($existingSettings, $data['settings']) : $existingSettings;
 
-            $sender->senderAccount()->update([
-
-                'settings' => $newSettings,
-
-            ]);
+            $sender->senderAccount()->updateOrCreate(
+                ['email_sender_id' => $sender->id],
+                ['settings' => $newSettings]
+            );
 
             return $sender->fresh()->load('senderAccount');
 
