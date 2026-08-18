@@ -93,9 +93,12 @@ class EmailSenderService
 
             ]);
 
+            $existingSettings = $sender->senderAccount?->settings ?? [];
+            $newSettings = array_merge($existingSettings, $data['settings'] ?? []);
+
             $sender->senderAccount()->update([
 
-                'settings' => $data['settings'],
+                'settings' => $newSettings,
 
             ]);
 

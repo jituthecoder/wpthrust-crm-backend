@@ -26,6 +26,8 @@ Route::post('/login', [AuthController::class, 'login']);
 // OAuth Routes
 Route::get('/oauth/google/redirect', [OAuthController::class, 'googleRedirect']);
 Route::get('/oauth/google/callback', [OAuthController::class, 'googleCallback']);
+Route::get('/oauth/microsoft/redirect', [OAuthController::class, 'microsoftRedirect']);
+Route::get('/oauth/microsoft/callback', [OAuthController::class, 'microsoftCallback']);
 
 // Email Open, Click & Unsubscribe Tracking Routes
 Route::get('/track/open/{campaignLead}', [EmailTrackingController::class, 'trackOpen']);

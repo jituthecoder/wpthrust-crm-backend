@@ -21,7 +21,7 @@ class OAuthController extends Controller
     public function googleRedirect(Request $request)
     {
         $clientId = config('services.google.client_id') ?: env('GOOGLE_CLIENT_ID');
-        $redirectUri = config('services.google.redirect_uri') ?: env('GOOGLE_REDIRECT_URI', 'https://api-crm.wpthrust.in/api/oauth/google/callback');
+        $redirectUri = config('services.google.redirect_uri') ?: env('GOOGLE_REDIRECT_URI') ?: url('/api/oauth/google/callback');
 
         if (empty($clientId)) {
             return response()->json([
@@ -83,7 +83,7 @@ class OAuthController extends Controller
      */
     public function googleCallback(Request $request)
     {
-        $frontendUrl = rtrim(env('FRONTEND_URL', 'https://crm.wpthrust.in'), '/');
+        $frontendUrl = rtrim(env('FRONTEND_URL') ?: config('app.frontend_url') ?: 'http://localhost:5173', '/');
         $redirectTabUrl = $frontendUrl . '/email-campaigns?tab=senders';
 
         try {
@@ -96,7 +96,7 @@ class OAuthController extends Controller
 
             $clientId = config('services.google.client_id') ?: env('GOOGLE_CLIENT_ID');
             $clientSecret = config('services.google.client_secret') ?: env('GOOGLE_CLIENT_SECRET');
-            $redirectUri = config('services.google.redirect_uri') ?: env('GOOGLE_REDIRECT_URI', 'https://api-crm.wpthrust.in/api/oauth/google/callback');
+            $redirectUri = config('services.google.redirect_uri') ?: env('GOOGLE_REDIRECT_URI') ?: url('/api/oauth/google/callback');
 
             if (empty($clientId) || empty($clientSecret)) {
                 return redirect($redirectTabUrl . '&oauth_error=' . urlencode('GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing in server .env'));
@@ -189,6 +189,189 @@ class OAuthController extends Controller
             });
 
             return redirect($redirectTabUrl . '&oauth_success=' . urlencode("Google account ({$email}) connected successfully!"));
+        } catch (\Throwable $e) {
+            return redirect($redirectTabUrl . '&oauth_error=' . urlencode($e->getMessage()));
+        }
+    }
+
+    /**
+     * Redirect to Microsoft OAuth Consent Screen
+     */
+    public function microsoftRedirect(Request $request)
+    {
+        $clientId = config('services.microsoft.client_id') ?: env('MICROSOFT_CLIENT_ID');
+        $redirectUri = config('services.microsoft.redirect_uri') ?: env('MICROSOFT_REDIRECT_URI') ?: url('/api/oauth/microsoft/callback');
+
+        if (empty($clientId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'MICROSOFT_CLIENT_ID is not configured in .env file.',
+            ], 422);
+        }
+
+        $userId = Auth::id() ?? $request->query('user_id');
+        if ($userId && !User::where('id', $userId)->exists()) {
+            $userId = User::min('id');
+        }
+        if (!$userId) {
+            $userId = User::min('id');
+        }
+
+        $userObj = $userId ? User::find($userId) : null;
+        $orgId = Auth::user()?->organization_id ?? $request->query('organization_id') ?? $userObj?->organization_id;
+        if (!$orgId || !Organization::where('id', $orgId)->exists()) {
+            $orgId = Organization::min('id') ?? 1;
+        }
+
+        $stateData = base64_encode(json_encode([
+            'user_id' => $userId,
+            'organization_id' => $orgId,
+            'token' => Str::random(16),
+        ]));
+
+        $scopes = [
+            'openid',
+            'profile',
+            'email',
+            'offline_access',
+            'User.Read',
+            'Mail.Send',
+        ];
+
+        $params = http_build_query([
+            'client_id' => $clientId,
+            'redirect_uri' => $redirectUri,
+            'response_type' => 'code',
+            'scope' => implode(' ', $scopes),
+            'response_mode' => 'query',
+            'state' => $stateData,
+        ]);
+
+        $url = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize?' . $params;
+
+        if ($request->wantsJson() || $request->query('mode') === 'json') {
+            return response()->json([
+                'success' => true,
+                'url' => $url,
+            ]);
+        }
+
+        return redirect()->away($url);
+    }
+
+    /**
+     * Handle Microsoft OAuth Callback
+     */
+    public function microsoftCallback(Request $request)
+    {
+        $frontendUrl = rtrim(env('FRONTEND_URL') ?: config('app.frontend_url') ?: 'http://localhost:5173', '/');
+        $redirectTabUrl = $frontendUrl . '/email-campaigns?tab=senders';
+
+        try {
+            $code = $request->query('code');
+            $error = $request->query('error');
+            $errorDesc = $request->query('error_description');
+
+            if ($error || empty($code)) {
+                return redirect($redirectTabUrl . '&oauth_error=' . urlencode($errorDesc ?? $error ?? 'Authorization code missing from Microsoft'));
+            }
+
+            $clientId = config('services.microsoft.client_id') ?: env('MICROSOFT_CLIENT_ID');
+            $clientSecret = config('services.microsoft.client_secret') ?: env('MICROSOFT_CLIENT_SECRET');
+            $redirectUri = config('services.microsoft.redirect_uri') ?: env('MICROSOFT_REDIRECT_URI') ?: url('/api/oauth/microsoft/callback');
+
+            if (empty($clientId) || empty($clientSecret)) {
+                return redirect($redirectTabUrl . '&oauth_error=' . urlencode('MICROSOFT_CLIENT_ID or MICROSOFT_CLIENT_SECRET is missing in server .env'));
+            }
+
+            // Exchange authorization code for access & refresh tokens
+            $tokenResponse = Http::asForm()->post('https://login.microsoftonline.com/common/oauth2/v2.0/token', [
+                'client_id' => $clientId,
+                'client_secret' => $clientSecret,
+                'redirect_uri' => $redirectUri,
+                'grant_type' => 'authorization_code',
+                'code' => $code,
+                'scope' => 'openid profile email offline_access User.Read Mail.Send',
+            ]);
+
+            if (!$tokenResponse->successful()) {
+                $err = $tokenResponse->json('error_description') ?? $tokenResponse->json('error') ?? 'Failed to exchange authorization code with Microsoft';
+                return redirect($redirectTabUrl . '&oauth_error=' . urlencode($err));
+            }
+
+            $tokenData = $tokenResponse->json();
+            $accessToken = $tokenData['access_token'] ?? null;
+            $refreshToken = $tokenData['refresh_token'] ?? null;
+            $expiresIn = $tokenData['expires_in'] ?? 3599;
+
+            // Fetch Microsoft User Profile
+            $userInfoRes = Http::withToken($accessToken)->get('https://graph.microsoft.com/v1.0/me');
+            if (!$userInfoRes->successful()) {
+                return redirect($redirectTabUrl . '&oauth_error=Failed+to+fetch+Microsoft+user+profile');
+            }
+
+            $userInfo = $userInfoRes->json();
+            $email = $userInfo['mail'] ?? $userInfo['userPrincipalName'] ?? null;
+            $name = $userInfo['displayName'] ?? ($userInfo['givenName'] ? $userInfo['givenName'] . ' ' . $userInfo['surname'] : 'Microsoft Sender');
+
+            if (empty($email)) {
+                return redirect($redirectTabUrl . '&oauth_error=Microsoft+profile+did+not+provide+email');
+            }
+
+            // Decode state if present
+            $stateRaw = $request->query('state');
+            $stateData = json_decode(base64_decode($stateRaw), true) ?? [];
+
+            $userId = $stateData['user_id'] ?? Auth::id();
+            if ($userId && !User::where('id', $userId)->exists()) {
+                $userId = User::min('id');
+            }
+            if (!$userId) {
+                $userId = User::min('id');
+            }
+
+            $userObj = $userId ? User::find($userId) : null;
+            $orgId = $stateData['organization_id'] ?? Auth::user()?->organization_id ?? $userObj?->organization_id;
+            if (!$orgId || !Organization::where('id', $orgId)->exists()) {
+                $orgId = Organization::min('id') ?? 1;
+            }
+
+            DB::transaction(function () use ($orgId, $userId, $email, $name, $clientId, $clientSecret, $accessToken, $refreshToken, $expiresIn) {
+                $senderData = [
+                    'name' => $name . ' (Outlook)',
+                    'display_name' => $name,
+                    'daily_limit' => 500,
+                    'hourly_limit' => 50,
+                    'is_active' => true,
+                    'created_by' => $userId ?: null,
+                ];
+
+                $sender = EmailSender::updateOrCreate(
+                    [
+                        'organization_id' => $orgId,
+                        'email' => $email,
+                        'provider' => 'outlook',
+                    ],
+                    $senderData
+                );
+
+                EmailSenderAccount::updateOrCreate(
+                    [
+                        'email_sender_id' => $sender->id,
+                    ],
+                    [
+                        'settings' => [
+                            'client_id' => $clientId,
+                            'client_secret' => $clientSecret,
+                            'access_token' => $accessToken,
+                            'refresh_token' => $refreshToken,
+                            'token_expires_at' => now()->addSeconds($expiresIn)->timestamp,
+                        ],
+                    ]
+                );
+            });
+
+            return redirect($redirectTabUrl . '&oauth_success=' . urlencode("Microsoft account ({$email}) connected successfully!"));
         } catch (\Throwable $e) {
             return redirect($redirectTabUrl . '&oauth_error=' . urlencode($e->getMessage()));
         }
