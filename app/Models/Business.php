@@ -32,7 +32,8 @@ class Business extends Model
         'last_called_at',
         'next_followup_at',
         'is_called',
-        'is_archived',
+        'is_bounced',
+        'bounced_at',
     ];
 
     protected function casts(): array
@@ -40,9 +41,24 @@ class Business extends Model
         return [
             'is_called' => 'boolean',
             'is_archived' => 'boolean',
+            'is_bounced' => 'boolean',
             'last_called_at' => 'datetime',
             'next_followup_at' => 'datetime',
+            'bounced_at' => 'datetime',
         ];
+    }
+
+    public function scopeNeverBounced($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('is_bounced')
+              ->orWhere('is_bounced', false);
+        })->whereNull('bounced_at');
+    }
+
+    public function scopeBounced($query)
+    {
+        return $query->where('is_bounced', true)->orWhereNotNull('bounced_at');
     }
 
     protected static function boot()

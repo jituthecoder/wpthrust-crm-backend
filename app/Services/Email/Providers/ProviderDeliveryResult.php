@@ -75,6 +75,22 @@ class ProviderDeliveryResult
     }
 
     /**
+     * Get provider thread ID
+     */
+    public function getProviderThreadId(): ?string
+    {
+        return $this->providerThreadId;
+    }
+
+    /**
+     * Get provider response payload
+     */
+    public function getProviderResponse(): mixed
+    {
+        return $this->providerResponse;
+    }
+
+    /**
      * Convert result to array representation
      */
     public function toArray(): array

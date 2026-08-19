@@ -103,6 +103,14 @@ class EmailSender extends Model
         );
     }
 
+    public function inboxMessages()
+    {
+        return $this->hasMany(
+            InboxMessage::class,
+            'email_sender_id'
+        );
+    }
+
     public function creator()
     {
         return $this->belongsTo(

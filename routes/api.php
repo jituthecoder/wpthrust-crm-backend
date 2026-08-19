@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\TemplateVariableController;
 use App\Http\Controllers\Api\EmailCampaignController;
 use App\Http\Controllers\Api\OAuthController;
 use App\Http\Controllers\Api\EmailTrackingController;
+use App\Http\Controllers\Api\InboxController;
 
 /*
 |--------------------------------------------------------------------------
@@ -253,8 +254,22 @@ Route::middleware('auth:sanctum')->group(function () {
             [EmailCampaignController::class, 'retryLead']
         );
 
-        
+        /*
+        |--------------------------------------------------------------------------
+        | Unified Inbox
+        |--------------------------------------------------------------------------
+        */
 
+        Route::get('/inbox', [InboxController::class, 'index']);
+        Route::get('/inbox/senders', [InboxController::class, 'senders']);
+        Route::get('/inbox/threads/{threadId}', [InboxController::class, 'thread']);
+        Route::get('/inbox/{inboxMessage}', [InboxController::class, 'show']);
+        Route::post('/inbox/send', [InboxController::class, 'send']);
+        Route::post('/inbox/{inboxMessage}/reply', [InboxController::class, 'reply']);
+        Route::put('/inbox/{inboxMessage}/mark-read', [InboxController::class, 'markRead']);
+        Route::put('/inbox/{inboxMessage}/star', [InboxController::class, 'toggleStar']);
+        Route::delete('/inbox/{inboxMessage}', [InboxController::class, 'destroy']);
+        Route::post('/inbox/sync', [InboxController::class, 'sync']);
 
     });
 

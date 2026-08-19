@@ -52,6 +52,7 @@ class OAuthController extends Controller
 
         $scopes = [
             'https://www.googleapis.com/auth/gmail.send',
+            'https://www.googleapis.com/auth/gmail.readonly',
             'https://www.googleapis.com/auth/userinfo.email',
             'https://www.googleapis.com/auth/userinfo.profile',
         ];
@@ -236,6 +237,7 @@ class OAuthController extends Controller
             'offline_access',
             'User.Read',
             'Mail.Send',
+            'Mail.Read',
         ];
 
         $params = http_build_query([
@@ -291,7 +293,7 @@ class OAuthController extends Controller
                 'redirect_uri' => $redirectUri,
                 'grant_type' => 'authorization_code',
                 'code' => $code,
-                'scope' => 'openid profile email offline_access User.Read Mail.Send',
+                'scope' => 'openid profile email offline_access User.Read Mail.Send Mail.Read',
             ]);
 
             if (!$tokenResponse->successful()) {

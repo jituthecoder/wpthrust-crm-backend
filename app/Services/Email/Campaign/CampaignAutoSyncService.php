@@ -17,7 +17,7 @@ class CampaignAutoSyncService
      */
     public function syncMatchingLeads(Business $business): int
     {
-        if (empty($business->email)) {
+        if (empty($business->email) || $business->is_bounced || !empty($business->bounced_at) || $business->lead_status === 'bounced') {
             return 0;
         }
 
@@ -83,6 +83,7 @@ class CampaignAutoSyncService
 
         $query = Business::whereNotNull('email')
             ->where('email', '!=', '')
+            ->neverBounced()
             ->whereNotIn('id', $existingBusinessIds)
             ->with('audit');
 
@@ -118,6 +119,11 @@ class CampaignAutoSyncService
      */
     public function matchesCriteria(Business $business, array $criteria): bool
     {
+        // Always exclude bounced leads unless explicitly allowed
+        if (($criteria['exclude_bounced'] ?? true) && ($business->is_bounced || !empty($business->bounced_at) || $business->lead_status === 'bounced')) {
+            return false;
+        }
+
         if (empty($criteria)) {
             return true; // No strict criteria -> match all leads with email
         }

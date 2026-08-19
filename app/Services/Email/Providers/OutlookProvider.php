@@ -87,6 +87,27 @@ class OutlookProvider implements EmailProviderInterface
                 );
             }
 
+            $inReplyTo = $settings['in_reply_to'] ?? null;
+
+            // If this is a reply to an existing Outlook message, use Graph API's official /reply endpoint
+            if (!empty($inReplyTo) && !str_starts_with($inReplyTo, 'sent-')) {
+                $replyRes = Http::withToken($accessToken)
+                    ->withHeaders(['Prefer' => 'IdType="ImmutableId"'])
+                    ->post("https://graph.microsoft.com/v1.0/me/messages/{$inReplyTo}/reply", [
+                        'comment' => $rendered,
+                    ]);
+
+                if ($replyRes->successful() || $replyRes->status() === 202) {
+                    $replyData = $replyRes->json();
+                    return ProviderDeliveryResult::success(
+                        providerMessageId: $replyData['id'] ?? ('outlook_reply_' . uniqid()),
+                        providerThreadId: $replyData['conversationId'] ?? $inReplyTo,
+                        providerResponse: $replyData
+                    );
+                }
+            }
+
+            // Standard sendMail fallback without illegal internetMessageHeaders
             $payload = [
                 'message' => [
                     'subject' => $subject,
@@ -133,7 +154,7 @@ class OutlookProvider implements EmailProviderInterface
     /**
      * Get valid access token, automatically refreshing if expired
      */
-    protected function getValidAccessToken(array &$settings): ?string
+    public function getValidAccessToken(array &$settings, ?int $emailSenderId = null): ?string
     {
         $accessToken = $settings['access_token'] ?? null;
         $expiresAt = $settings['token_expires_at'] ?? 0;
@@ -175,9 +196,9 @@ class OutlookProvider implements EmailProviderInterface
                     $settings['refresh_token'] = $newRefreshToken;
                     $settings['token_expires_at'] = time() + $expiresIn;
 
-                    // Persist updated token in DB if email_sender_id is present
-                    if (!empty($settings['email_sender_id'])) {
-                        $account = EmailSenderAccount::where('email_sender_id', $settings['email_sender_id'])->first();
+                    $senderId = $emailSenderId ?? ($settings['email_sender_id'] ?? null);
+                    if ($senderId) {
+                        $account = EmailSenderAccount::where('email_sender_id', $senderId)->first();
                         if ($account) {
                             $updatedSettings = array_merge($account->settings ?? [], [
                                 'access_token' => $newAccessToken,

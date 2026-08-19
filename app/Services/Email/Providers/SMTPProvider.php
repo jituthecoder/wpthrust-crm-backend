@@ -94,6 +94,14 @@ class SMTPProvider implements EmailProviderInterface
                 }
             }
 
+            // Set In-Reply-To and References headers for thread matching
+            $inReplyTo = $settings['in_reply_to'] ?? null;
+            if (!empty($inReplyTo)) {
+                $formattedReplyTo = str_starts_with($inReplyTo, '<') ? $inReplyTo : "<{$inReplyTo}>";
+                $email->getHeaders()->addTextHeader('In-Reply-To', $formattedReplyTo);
+                $email->getHeaders()->addTextHeader('References', $formattedReplyTo);
+            }
+
             $symfonyMailer->send($email);
             $messageId = $email->generateMessageId();
 

@@ -88,6 +88,8 @@ class CampaignLead extends Model
 
         'replied_at',
 
+        'bounced_at',
+
         'unsubscribe_token',
 
         'unsubscribed_at',
@@ -119,6 +121,8 @@ class CampaignLead extends Model
         'clicked_at' => 'datetime',
 
         'replied_at' => 'datetime',
+
+        'bounced_at' => 'datetime',
 
         'unsubscribed_at' => 'datetime',
 
@@ -243,6 +247,11 @@ class CampaignLead extends Model
         return $query->where('status', 'failed');
     }
 
+    public function scopeBounced($query)
+    {
+        return $query->where('status', 'bounced')->orWhereNotNull('bounced_at');
+    }
+
     public function scopeDue($query, $timestamp = null)
     {
         $time = $timestamp ?? now();
@@ -283,6 +292,11 @@ class CampaignLead extends Model
     public function isFailed(): bool
     {
         return $this->status === 'failed';
+    }
+
+    public function isBounced(): bool
+    {
+        return $this->status === 'bounced' || !empty($this->bounced_at);
     }
 
     public function canRetry(): bool

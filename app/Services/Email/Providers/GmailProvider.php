@@ -86,10 +86,18 @@ class GmailProvider implements EmailProviderInterface
                 $fromHeader = $fromName ? "{$fromName} <{$fromAddr}>" : $fromAddr;
             }
 
+            $inReplyTo = $settings['in_reply_to'] ?? null;
+            $threadId = $settings['thread_id'] ?? null;
+
             // Construct RFC 2822 raw email headers
             $rawEmail = "From: {$fromHeader}\r\n";
             $rawEmail .= "To: {$toHeader}\r\n";
             $rawEmail .= "Subject: {$subject}\r\n";
+            if (!empty($inReplyTo)) {
+                $formattedReplyTo = str_starts_with($inReplyTo, '<') ? $inReplyTo : "<{$inReplyTo}>";
+                $rawEmail .= "In-Reply-To: {$formattedReplyTo}\r\n";
+                $rawEmail .= "References: {$formattedReplyTo}\r\n";
+            }
             $rawEmail .= "MIME-Version: 1.0\r\n";
             $rawEmail .= "Content-Type: text/html; charset=utf-8\r\n\r\n";
             $rawEmail .= $rendered;
@@ -97,9 +105,12 @@ class GmailProvider implements EmailProviderInterface
             // Base64Url encoding
             $base64Url = rtrim(strtr(base64_encode($rawEmail), '+/', '-_'), '=');
 
-            $response = Http::withToken($accessToken)->post('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', [
-                'raw' => $base64Url,
-            ]);
+            $payload = ['raw' => $base64Url];
+            if (!empty($threadId)) {
+                $payload['threadId'] = $threadId;
+            }
+
+            $response = Http::withToken($accessToken)->post('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', $payload);
 
             if (!$response->successful()) {
                 $err = $response->json('error.message') ?? 'Gmail API send failed';
@@ -121,13 +132,13 @@ class GmailProvider implements EmailProviderInterface
         }
     }
 
-    protected function getValidAccessToken(array $settings): ?string
+    public function getValidAccessToken(array &$settings, ?int $emailSenderId = null): ?string
     {
         $accessToken = $settings['access_token'] ?? null;
         $refreshToken = $settings['refresh_token'] ?? null;
         $expiresAt = $settings['token_expires_at'] ?? 0;
 
-        // Return current access token if still valid
+        // Return current access token if still valid (with 60s buffer)
         if ($accessToken && time() < ($expiresAt - 60)) {
             return $accessToken;
         }
@@ -137,7 +148,7 @@ class GmailProvider implements EmailProviderInterface
             $clientId = $settings['client_id'] ?? config('services.google.client_id');
             $clientSecret = $settings['client_secret'] ?? config('services.google.client_secret');
 
-            $res = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+            $res = \Illuminate\Support\Facades\Http::asForm()->post('https://oauth2.googleapis.com/token', [
                 'client_id' => $clientId,
                 'client_secret' => $clientSecret,
                 'refresh_token' => $refreshToken,
@@ -145,7 +156,27 @@ class GmailProvider implements EmailProviderInterface
             ]);
 
             if ($res->successful()) {
-                return $res->json('access_token');
+                $newAccessToken = $res->json('access_token');
+                $expiresIn = $res->json('expires_in') ?? 3599;
+                
+                if ($newAccessToken) {
+                    $settings['access_token'] = $newAccessToken;
+                    $settings['token_expires_at'] = time() + $expiresIn;
+
+                    $senderId = $emailSenderId ?? ($settings['email_sender_id'] ?? null);
+                    if ($senderId) {
+                        $account = \App\Models\EmailSenderAccount::where('email_sender_id', $senderId)->first();
+                        if ($account) {
+                            $updatedSettings = array_merge($account->settings ?? [], [
+                                'access_token' => $newAccessToken,
+                                'token_expires_at' => time() + $expiresIn,
+                            ]);
+                            $account->update(['settings' => $updatedSettings]);
+                        }
+                    }
+
+                    return $newAccessToken;
+                }
             }
         }
 
