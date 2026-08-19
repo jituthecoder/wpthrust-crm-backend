@@ -56,6 +56,10 @@ class EmailSender extends Model
 
         'is_active',
 
+        'error_message',
+
+        'requires_reauth',
+
         'last_sent_at',
 
         'last_sync_at',
@@ -69,6 +73,8 @@ class EmailSender extends Model
     protected $casts = [
 
         'is_active' => 'boolean',
+
+        'requires_reauth' => 'boolean',
 
         'last_sent_at' => 'datetime',
 

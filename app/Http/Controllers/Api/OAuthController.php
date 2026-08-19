@@ -161,6 +161,8 @@ class OAuthController extends Controller
                     'daily_limit' => 500,
                     'hourly_limit' => 50,
                     'is_active' => true,
+                    'requires_reauth' => false,
+                    'error_message' => null,
                     'created_by' => $userId ?: null,
                 ];
 
@@ -345,6 +347,8 @@ class OAuthController extends Controller
                     'daily_limit' => 500,
                     'hourly_limit' => 50,
                     'is_active' => true,
+                    'requires_reauth' => false,
+                    'error_message' => null,
                     'created_by' => $userId ?: null,
                 ];
 

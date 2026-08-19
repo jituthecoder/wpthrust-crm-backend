@@ -94,7 +94,14 @@ class EmailSenderService
             ]);
 
             $existingSettings = $sender->senderAccount?->settings ?? [];
-            $newSettings = !empty($data['settings']) ? array_merge($existingSettings, $data['settings']) : $existingSettings;
+            $incomingSettings = $data['settings'] ?? [];
+
+            // If password is empty during update, retain existing password
+            if (empty($incomingSettings['password']) && !empty($existingSettings['password'])) {
+                $incomingSettings['password'] = $existingSettings['password'];
+            }
+
+            $newSettings = array_merge($existingSettings, array_filter($incomingSettings, fn($v) => $v !== null));
 
             $sender->senderAccount()->updateOrCreate(
                 ['email_sender_id' => $sender->id],

@@ -350,9 +350,27 @@ class SendCampaignLeadJob implements ShouldQueue
             );
 
             if ($result->isFailure()) {
-                throw new \Exception(
-                    $result->errorMessage ?? 'Email delivery failed via provider.'
-                );
+                $err = $result->errorMessage ?? 'Email delivery failed via provider.';
+                $lowerErr = strtolower($err);
+
+                // Detect OAuth / Authentication failures (JWT, token expired, invalid_grant, authentication failed)
+                $isAuthFailure = str_contains($lowerErr, 'token') ||
+                                 str_contains($lowerErr, 'jwt') ||
+                                 str_contains($lowerErr, 'authentication') ||
+                                 str_contains($lowerErr, 'reconnect') ||
+                                 str_contains($lowerErr, 'unauthorized') ||
+                                 str_contains($lowerErr, 'invalid_grant');
+
+                if ($isAuthFailure) {
+                    $sender->update([
+                        'is_active' => false,
+                        'requires_reauth' => true,
+                        'error_message' => $err,
+                    ]);
+                    \Illuminate\Support\Facades\Log::warning("Sender ID {$sender->id} ({$sender->email}) disabled due to auth failure: {$err}");
+                }
+
+                throw new \Exception($err);
             }
 
             /*

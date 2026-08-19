@@ -85,6 +85,7 @@ class CampaignMailerService
         */
 
         $settings = $sender->senderAccount?->settings ?? [];
+        $settings['email_sender_id'] = $sender->id;
 
         return $provider->send(
             $settings,

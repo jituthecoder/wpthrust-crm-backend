@@ -55,10 +55,11 @@ class OutlookProvider implements EmailProviderInterface
                 );
             }
 
-            $accessToken = $this->getValidAccessToken($settings);
+            $senderId = $settings['email_sender_id'] ?? $settings['id'] ?? null;
+            $accessToken = $this->getValidAccessToken($settings, $senderId);
             if (!$accessToken) {
                 return ProviderDeliveryResult::failure(
-                    ProviderSanitizer::sanitizeMessage('Microsoft Outlook access token is missing or could not be refreshed.')
+                    ProviderSanitizer::sanitizeMessage('Microsoft Outlook authentication failed: access token expired or invalid. Please reconnect your Microsoft account in Email Senders.')
                 );
             }
 
@@ -159,21 +160,21 @@ class OutlookProvider implements EmailProviderInterface
         $accessToken = $settings['access_token'] ?? null;
         $expiresAt = $settings['token_expires_at'] ?? 0;
 
-        // If access token is still valid (with 60-second buffer), use it
-        if ($accessToken && $expiresAt > (time() + 60)) {
+        // If access token is valid JWT (contains '.') and not expired (with 60s buffer), use it
+        if ($accessToken && str_contains($accessToken, '.') && $expiresAt > (time() + 60)) {
             return $accessToken;
         }
 
         $refreshToken = $settings['refresh_token'] ?? null;
         if (!$refreshToken) {
-            return $accessToken;
+            return null;
         }
 
         $clientId = $settings['client_id'] ?? config('services.microsoft.client_id') ?: env('MICROSOFT_CLIENT_ID');
         $clientSecret = $settings['client_secret'] ?? config('services.microsoft.client_secret') ?: env('MICROSOFT_CLIENT_SECRET');
 
         if (!$clientId || !$clientSecret) {
-            return $accessToken;
+            return null;
         }
 
         try {
@@ -182,7 +183,7 @@ class OutlookProvider implements EmailProviderInterface
                 'client_secret' => $clientSecret,
                 'grant_type' => 'refresh_token',
                 'refresh_token' => $refreshToken,
-                'scope' => 'openid profile email offline_access User.Read Mail.Send',
+                'scope' => 'openid profile email offline_access User.Read Mail.Send Mail.Read',
             ]);
 
             if ($response->successful()) {
@@ -191,7 +192,7 @@ class OutlookProvider implements EmailProviderInterface
                 $newRefreshToken = $data['refresh_token'] ?? $refreshToken;
                 $expiresIn = $data['expires_in'] ?? 3599;
 
-                if ($newAccessToken) {
+                if ($newAccessToken && str_contains($newAccessToken, '.')) {
                     $settings['access_token'] = $newAccessToken;
                     $settings['refresh_token'] = $newRefreshToken;
                     $settings['token_expires_at'] = time() + $expiresIn;
@@ -211,11 +212,13 @@ class OutlookProvider implements EmailProviderInterface
 
                     return $newAccessToken;
                 }
+            } else {
+                Log::warning("Microsoft OAuth token refresh failed (HTTP {$response->status()}): " . $response->body());
             }
         } catch (\Throwable $e) {
             Log::error("Failed to refresh Microsoft OAuth token: " . $e->getMessage());
         }
 
-        return $accessToken;
+        return null;
     }
 }

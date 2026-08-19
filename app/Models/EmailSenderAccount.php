@@ -21,9 +21,7 @@ class EmailSenderAccount extends Model
     ];
 
     protected $hidden = [
-
-        'settings',
-
+        //
     ];
 
     /*

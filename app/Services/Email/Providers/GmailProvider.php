@@ -180,7 +180,7 @@ class GmailProvider implements EmailProviderInterface
             }
         }
 
-        return $accessToken;
+        return null;
     }
 
     public function sync(): void
