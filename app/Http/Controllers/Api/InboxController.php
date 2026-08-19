@@ -169,24 +169,41 @@ class InboxController extends Controller
     {
         $senderId = $request->input('email_sender_id');
         $senders = EmailSender::where('is_active', true);
-        if ($senderId) {
+
+        if (!empty($senderId)) {
             $senders->where('id', $senderId);
+        } else {
+            // Limit batch sync to max 5 active senders per sync to prevent timeouts
+            $senders->limit(5);
         }
+
         $senders = $senders->get();
+
+        if ($senders->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active sender account found to sync.',
+                'data' => ['synced' => 0, 'bounces' => 0],
+            ]);
+        }
 
         $synced = 0;
         $bounces = 0;
+        $syncedSenders = [];
+
         foreach ($senders as $sender) {
             $res = $this->syncService->syncSender($sender);
             if ($res['success']) {
                 $synced += ($res['synced'] ?? 0);
                 $bounces += ($res['bounces'] ?? 0);
+                $syncedSenders[] = $sender->email;
             }
         }
 
+        $targetName = (count($syncedSenders) === 1) ? $syncedSenders[0] : (count($syncedSenders) . ' active senders');
         $msg = ($synced > 0 || $bounces > 0)
-            ? "Synced {$synced} new message(s) and processed {$bounces} bounce(s)."
-            : "Mailbox is up to date (no new messages).";
+            ? "Synced {$synced} new message(s) for {$targetName}."
+            : "Mailbox for {$targetName} is up to date.";
 
         return response()->json([
             'success' => true,
@@ -194,6 +211,7 @@ class InboxController extends Controller
             'data' => [
                 'synced' => $synced,
                 'bounces' => $bounces,
+                'senders' => $syncedSenders,
             ],
         ]);
     }
