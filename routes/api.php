@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\EmailCampaignController;
 use App\Http\Controllers\Api\OAuthController;
 use App\Http\Controllers\Api\EmailTrackingController;
 use App\Http\Controllers\Api\InboxController;
+use App\Http\Controllers\Api\ContactListController;
 
 /*
 |--------------------------------------------------------------------------
@@ -249,10 +250,34 @@ Route::middleware('auth:sanctum')->group(function () {
             [EmailCampaignController::class, 'syncLeads']
         );
 
+        Route::delete(
+            'email-campaigns/{emailCampaign}/leads/{campaignLead}',
+            [EmailCampaignController::class, 'removeLead']
+        );
+
         Route::post(
             'email-campaigns/{emailCampaign}/leads/{campaignLead}/retry',
             [EmailCampaignController::class, 'retryLead']
         );
+
+        Route::post(
+            'email-campaigns/{emailCampaign}/import-contact-list',
+            [EmailCampaignController::class, 'importContactList']
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Contact Lists
+        |--------------------------------------------------------------------------
+        */
+
+        Route::apiResource('contact-lists', ContactListController::class);
+        Route::get('contact-lists/{contactList}/leads', [ContactListController::class, 'getLeads']);
+        Route::get('contact-lists/{contactList}/export', [ContactListController::class, 'export']);
+        Route::post('contact-lists/{contactList}/contacts', [ContactListController::class, 'addManualContact']);
+        Route::post('contact-lists/{contactList}/import-csv', [ContactListController::class, 'importCsv']);
+        Route::put('contact-lists/{contactList}/contacts/{contactListLead}', [ContactListController::class, 'updateLead']);
+        Route::delete('contact-lists/{contactList}/leads/{contactListLead}', [ContactListController::class, 'removeLead']);
 
         /*
         |--------------------------------------------------------------------------

@@ -76,6 +76,10 @@ class CampaignStarterService
             |--------------------------------------------------------------------------
             */
 
+            if ($campaign->status === 'running') {
+                return $campaign;
+            }
+
             if ($campaign->status !== 'paused') {
                 throw new Exception(
                     'Only a paused campaign can be resumed.'

@@ -265,15 +265,24 @@ class TemplateVariableService
     }
 
     /**
-     * Replace Variables
+     * Replace Variables (supports Business or ContactListLead)
      */
     public function render(
         string $content,
-        Business $business
+        $business
     ): string
     {
-        $business->loadMissing('audit');
-        $audit = $business->audit;
+        $audit = null;
+        if ($business instanceof \App\Models\Business) {
+            $business->loadMissing('audit');
+            $audit = $business->audit;
+        } elseif (!empty($business->business_id)) {
+            $realBiz = \App\Models\Business::find($business->business_id);
+            if ($realBiz) {
+                $realBiz->loadMissing('audit');
+                $audit = $realBiz->audit;
+            }
+        }
         $screenshotUrl = optional($audit)->mobile_screenshot_url;
 
         // Clean website URL: strip query parameters (?utm_source=...), fragments, and leading protocol
@@ -317,7 +326,7 @@ class TemplateVariableService
 
             '{{review_count}}' => optional($audit)->review_count ?? '',
 
-            '{{mobile_pagespeed}}' => optional($audit)->mobile_pagespeed ?? '',
+            '{{mobile_pagespeed}}' => $business->mobile_pagespeed ?? optional($audit)->mobile_pagespeed ?? '',
 
             '{{desktop_pagespeed}}' => optional($audit)->desktop_pagespeed ?? '',
 

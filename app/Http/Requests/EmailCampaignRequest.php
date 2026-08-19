@@ -84,6 +84,11 @@ class EmailCampaignRequest extends FormRequest
             |--------------------------------------------------------------------------
             */
 
+            'contact_list_id' => [
+                'nullable',
+                'exists:contact_lists,id'
+            ],
+
             'businesses' => [
                 'nullable',
                 'array',

@@ -40,13 +40,12 @@ class EmailCampaignService
             |--------------------------------------------------------------------------
             */
 
-            $businesses = Business::whereIn(
-                'id',
-                $data['businesses']
-            )
-                ->whereNotNull('email')
-                ->where('email', '!=', '')
-                ->get();
+            $businesses = !empty($data['businesses'])
+                ? Business::whereIn('id', $data['businesses'])
+                    ->whereNotNull('email')
+                    ->where('email', '!=', '')
+                    ->get()
+                : collect();
 
             /*
             |--------------------------------------------------------------------------
@@ -134,15 +133,33 @@ class EmailCampaignService
             */
 
             $leadRows = [];
-            foreach ($businesses as $business) {
-                $leadRows[] = [
-                    'email_campaign_id' => $campaign->id,
-                    'business_id' => $business->id,
-                    'email_template_version_id' => null,
-                    'status' => 'pending',
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
+            if (!empty($data['contact_list_id'])) {
+                $contactListLeads = \App\Models\ContactListLead::where('contact_list_id', $data['contact_list_id'])
+                    ->whereNotNull('email')
+                    ->where('email', '!=', '')
+                    ->get();
+
+                foreach ($contactListLeads as $cLead) {
+                    $leadRows[] = [
+                        'email_campaign_id' => $campaign->id,
+                        'business_id' => $cLead->business_id,
+                        'contact_list_lead_id' => $cLead->id,
+                        'status' => 'pending',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+            } elseif (!empty($businesses)) {
+                foreach ($businesses as $business) {
+                    $leadRows[] = [
+                        'email_campaign_id' => $campaign->id,
+                        'business_id' => $business->id,
+                        'contact_list_lead_id' => null,
+                        'status' => 'pending',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
             }
 
             if (!empty($leadRows)) {
@@ -150,6 +167,10 @@ class EmailCampaignService
                     CampaignLead::insert($chunk);
                 }
             }
+
+            $campaign->update([
+                'total_leads' => CampaignLead::where('email_campaign_id', $campaign->id)->count(),
+            ]);
 
             // Sync matching leads if auto_sync_enabled
             if ($campaign->auto_sync_enabled) {
@@ -278,7 +299,7 @@ class EmailCampaignService
                         'failure_reason' => null,
                     ]);
 
-                if ($campaign->status === 'running') {
+                if ($campaign->status === 'paused') {
                     app(\App\Services\Email\Campaign\CampaignStarterService::class)->resume($campaign);
                 }
             }

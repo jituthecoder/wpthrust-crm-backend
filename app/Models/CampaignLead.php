@@ -18,6 +18,8 @@ class CampaignLead extends Model
 
         'business_id',
 
+        'contact_list_lead_id',
+
         'email_sender_id',
 
         'email_template_version_id',
@@ -163,6 +165,17 @@ class CampaignLead extends Model
     {
         return $this->belongsTo(
             Business::class
+        );
+    }
+
+    /**
+     * Contact List Lead
+     */
+    public function contactListLead()
+    {
+        return $this->belongsTo(
+            ContactListLead::class,
+            'contact_list_lead_id'
         );
     }
 

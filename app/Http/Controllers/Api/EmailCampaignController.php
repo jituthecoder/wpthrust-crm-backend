@@ -428,6 +428,107 @@ class EmailCampaignController extends Controller
     }
 
     /**
+     * Remove Lead from Campaign
+     */
+    public function removeLead(
+        EmailCampaign $emailCampaign,
+        CampaignLead $campaignLead
+    ) {
+        $this->authorizeTenant($emailCampaign);
+
+        if ($campaignLead->email_campaign_id !== $emailCampaign->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lead does not belong to this campaign.',
+            ], 404);
+        }
+
+        $campaignLead->delete();
+        $emailCampaign->update([
+            'total_leads' => $emailCampaign->leads()->count(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Lead removed from campaign successfully.',
+        ]);
+    }
+
+    /**
+     * Import Leads from Contact List to Campaign
+     */
+    public function importContactList(
+        EmailCampaign $emailCampaign,
+        Request $request
+    ) {
+        $this->authorizeTenant($emailCampaign);
+
+        $request->validate([
+            'contact_list_id' => 'required|exists:contact_lists,id',
+        ]);
+
+        $contactListLeads = \App\Models\ContactListLead::where('contact_list_id', $contactList->id)
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->get();
+
+        if ($contactListLeads->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => "The contact list '{$contactList->name}' contains no contacts with an email address.",
+            ], 400);
+        }
+
+        $existingContactListLeadIds = CampaignLead::where('email_campaign_id', $emailCampaign->id)
+            ->whereNotNull('contact_list_lead_id')
+            ->pluck('contact_list_lead_id')
+            ->toArray();
+
+        $leadRows = [];
+        $now = now();
+        $addedCount = 0;
+
+        foreach ($contactListLeads as $cLead) {
+            if (in_array($cLead->id, $existingContactListLeadIds)) {
+                continue;
+            }
+
+            $leadRows[] = [
+                'email_campaign_id' => $emailCampaign->id,
+                'business_id' => $cLead->business_id,
+                'contact_list_lead_id' => $cLead->id,
+                'status' => 'pending',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+            $addedCount++;
+        }
+
+        if (!empty($leadRows)) {
+            foreach (array_chunk($leadRows, 500) as $chunk) {
+                CampaignLead::insert($chunk);
+            }
+        }
+
+        $emailCampaign->update([
+            'total_leads' => CampaignLead::where('email_campaign_id', $emailCampaign->id)->count(),
+        ]);
+
+        if ($emailCampaign->status === 'completed' && $addedCount > 0) {
+            $emailCampaign->update(['status' => 'running']);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Successfully imported {$addedCount} contact(s) from '{$contactList->name}' into campaign.",
+            'data' => [
+                'added_count' => $addedCount,
+                'total_leads' => $emailCampaign->fresh()->total_leads,
+            ],
+        ]);
+    }
+
+    /**
      * Trigger Manual Sync of Matching Leads for Campaign
      */
     public function syncLeads(

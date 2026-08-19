@@ -280,6 +280,8 @@ class SendCampaignLeadJob implements ShouldQueue
                 );
             }
 
+            $targetEntity = $lead->contactListLead ?? $lead->business;
+
             /*
             |--------------------------------------------------------------------------
             | Render Subject
@@ -288,7 +290,7 @@ class SendCampaignLeadJob implements ShouldQueue
 
             $subject = $renderer->renderSubject(
                 $version->subject,
-                $lead->business
+                $targetEntity
             );
 
             /*
@@ -299,7 +301,7 @@ class SendCampaignLeadJob implements ShouldQueue
 
             $html = $renderer->renderHtml(
                 $version->html,
-                $lead->business
+                $targetEntity
             );
 
             /*
@@ -310,7 +312,7 @@ class SendCampaignLeadJob implements ShouldQueue
 
             $plain = $renderer->renderPlainText(
                 $version->plain_text,
-                $lead->business
+                $targetEntity
             );
 
             /*

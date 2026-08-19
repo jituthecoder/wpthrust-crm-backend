@@ -32,12 +32,14 @@ class CampaignMailerService
         |--------------------------------------------------------------------------
         */
 
-        if (empty($lead->business->email)) {
+        $targetEntity = $lead->contactListLead ?? $lead->business;
+        $recipientEmail = $targetEntity?->email;
+        $recipientName = $targetEntity?->business_name;
 
+        if (empty($recipientEmail)) {
             throw new \Exception(
-                'Business email not found.'
+                'Recipient email not found.'
             );
-
         }
 
         /*
@@ -68,8 +70,8 @@ class CampaignMailerService
             $plainText
         ))
             ->to(
-                $lead->business->email,
-                $lead->business->business_name
+                $recipientEmail,
+                $recipientName
             )
             ->from(
                 $sender->email,

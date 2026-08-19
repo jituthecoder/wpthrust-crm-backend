@@ -19,7 +19,7 @@ class TemplateRendererService
      */
     public function renderSubject(
         string $subject,
-        Business $business
+        $business
     ): string {
         return $this->variableService->render(
             $subject,
@@ -32,7 +32,7 @@ class TemplateRendererService
      */
     public function renderHtml(
         string $html,
-        Business $business
+        $business
     ): string {
         return $this->variableService->render(
             $html,
@@ -45,7 +45,7 @@ class TemplateRendererService
      */
     public function renderPlainText(
         ?string $text,
-        Business $business
+        $business
     ): ?string {
 
         if (!$text) {
