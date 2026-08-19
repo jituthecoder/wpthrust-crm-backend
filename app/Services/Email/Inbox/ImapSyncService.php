@@ -351,6 +351,27 @@ class ImapSyncService
      */
     protected function storeMessageAndProcess(EmailSender $sender, array $parsed): array
     {
+        // Check for existing duplicate message
+        $existing = null;
+        if (!empty($parsed['message_id'])) {
+            $existing = InboxMessage::where('message_id', $parsed['message_id'])->first();
+        }
+        if (!$existing && !empty($parsed['from_email']) && !empty($parsed['subject'])) {
+            $existing = InboxMessage::where('email_sender_id', $sender->id)
+                ->where('from_email', strtolower($parsed['from_email']))
+                ->where('to_email', strtolower($parsed['to_email']))
+                ->where('subject', $parsed['subject'])
+                ->where('received_at', $parsed['received_at'] ?? now())
+                ->first();
+        }
+
+        if ($existing) {
+            return [
+                'message' => $existing,
+                'is_bounce' => ($existing->folder === 'bounce'),
+            ];
+        }
+
         $isBounce = $this->bounceParser->isBounceMessage($parsed);
         $isSent = (strtolower($parsed['from_email'] ?? '') === strtolower($sender->email));
         $folder = $isBounce ? 'bounce' : ($isSent ? 'sent' : 'inbox');

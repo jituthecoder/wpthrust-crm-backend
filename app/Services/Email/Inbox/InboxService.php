@@ -78,12 +78,20 @@ class InboxService
     /**
      * Get conversation thread messages.
      */
-    public function getThread(string $threadId)
+    public function getThread(?string $threadId)
     {
+        if (empty($threadId) || !trim($threadId)) {
+            return collect();
+        }
+
+        $threadId = trim($threadId);
+
         return InboxMessage::with(['emailSender', 'business'])
-            ->where('thread_id', $threadId)
-            ->orWhere('message_id', $threadId)
-            ->orWhere('in_reply_to', $threadId)
+            ->where(function ($q) use ($threadId) {
+                $q->where('thread_id', $threadId)
+                  ->orWhere('message_id', $threadId)
+                  ->orWhere('in_reply_to', $threadId);
+            })
             ->orderBy('received_at', 'asc')
             ->get();
     }
