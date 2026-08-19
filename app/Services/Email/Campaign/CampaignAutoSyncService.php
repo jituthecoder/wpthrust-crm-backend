@@ -84,27 +84,37 @@ class CampaignAutoSyncService
         $query = Business::whereNotNull('email')
             ->where('email', '!=', '')
             ->neverBounced()
-            ->whereNotIn('id', $existingBusinessIds)
             ->with('audit');
+
+        if (!empty($existingBusinessIds)) {
+            $query->whereNotIn('id', $existingBusinessIds);
+        }
 
         $candidateLeads = $query->get();
 
+        $newLeadRows = [];
+        $now = now();
         foreach ($candidateLeads as $business) {
             if ($this->matchesCriteria($business, $criteria)) {
-
-                // Attach business as pending lead scheduled for delivery via CampaignDeliverySchedulerService
-                $lead = CampaignLead::create([
+                $newLeadRows[] = [
                     'email_campaign_id' => $campaign->id,
                     'business_id' => $business->id,
                     'status' => 'pending',
-                    'scheduled_at' => now(),
-                ]);
-
-                $campaign->increment('total_leads');
+                    'scheduled_at' => $now,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
                 $attachedCount++;
-
-                Log::info("Manual/Auto-synced Lead #{$business->id} ({$business->email}) to Campaign #{$campaign->id} ({$campaign->name})");
             }
+        }
+
+        if (!empty($newLeadRows)) {
+            foreach (array_chunk($newLeadRows, 500) as $chunk) {
+                CampaignLead::insert($chunk);
+            }
+            $campaign->update([
+                'total_leads' => CampaignLead::where('email_campaign_id', $campaign->id)->count(),
+            ]);
         }
 
         if ($attachedCount > 0 && $campaign->status === 'completed') {

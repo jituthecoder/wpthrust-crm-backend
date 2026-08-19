@@ -108,25 +108,23 @@ class EmailCampaignService
             |--------------------------------------------------------------------------
             */
 
+            $senderRows = [];
+            $now = now();
             foreach ($data['senders'] as $senderId) {
-
-                CampaignSender::create([
-
+                $senderRows[] = [
                     'email_campaign_id' => $campaign->id,
-
                     'email_sender_id' => $senderId,
-
                     'priority' => 1,
-
                     'weight' => 1,
-
                     'daily_limit' => null,
-
                     'hourly_limit' => null,
-
                     'is_active' => true,
-
-                ]);
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+            if (!empty($senderRows)) {
+                CampaignSender::insert($senderRows);
             }
 
             /*
@@ -135,19 +133,27 @@ class EmailCampaignService
             |--------------------------------------------------------------------------
             */
 
+            $leadRows = [];
             foreach ($businesses as $business) {
-
-                CampaignLead::create([
-
+                $leadRows[] = [
                     'email_campaign_id' => $campaign->id,
-
                     'business_id' => $business->id,
-
                     'email_template_version_id' => null,
-
                     'status' => 'pending',
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
 
-                ]);
+            if (!empty($leadRows)) {
+                foreach (array_chunk($leadRows, 500) as $chunk) {
+                    CampaignLead::insert($chunk);
+                }
+            }
+
+            // Sync matching leads if auto_sync_enabled
+            if ($campaign->auto_sync_enabled) {
+                app(\App\Services\Email\Campaign\CampaignAutoSyncService::class)->syncAllMatchingLeads($campaign);
             }
 
             /*
@@ -157,27 +163,19 @@ class EmailCampaignService
             */
 
             $campaign->update([
-
-                'total_leads' => $businesses->count(),
-
+                'total_leads' => CampaignLead::where('email_campaign_id', $campaign->id)->count(),
             ]);
 
             /*
             |--------------------------------------------------------------------------
-            | Return Campaign
+            | Return Campaign (omitting leads.business to avoid huge JSON payloads)
             |--------------------------------------------------------------------------
             */
 
             return $campaign->load([
-
                 'template',
-
                 'creator',
-
                 'senders.sender',
-
-                'leads.business',
-
             ]);
         });
     }
@@ -448,7 +446,9 @@ class EmailCampaignService
             */
 
             if (!empty($leadRows)) {
-                CampaignLead::insert($leadRows);
+                foreach (array_chunk($leadRows, 500) as $chunk) {
+                    CampaignLead::insert($chunk);
+                }
             }
 
             /*
@@ -477,20 +477,14 @@ class EmailCampaignService
 
             /*
             |--------------------------------------------------------------------------
-            | Return Updated Campaign
+            | Return Updated Campaign (omitting leads.business to avoid huge JSON payloads)
             |--------------------------------------------------------------------------
             */
 
             return $campaign->fresh()->load([
-
                 'template',
-
                 'creator',
-
                 'senders.sender',
-
-                'leads.business',
-
             ]);
         });
     }
