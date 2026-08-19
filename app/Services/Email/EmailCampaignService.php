@@ -267,6 +267,22 @@ class EmailCampaignService
                 if (!empty($senderRows)) {
                     CampaignSender::insert($senderRows);
                 }
+
+                // Reset leads whose sender was removed or that failed due to sender availability
+                CampaignLead::where('email_campaign_id', $campaign->id)
+                    ->where(function ($q) use ($data) {
+                        $q->whereNotIn('email_sender_id', $data['senders'] ?? [])
+                          ->orWhere('failure_reason', 'LIKE', '%email sender%');
+                    })
+                    ->update([
+                        'email_sender_id' => null,
+                        'status' => 'pending',
+                        'failure_reason' => null,
+                    ]);
+
+                if ($campaign->status === 'running') {
+                    app(\App\Services\Email\Campaign\CampaignStarterService::class)->resume($campaign);
+                }
             }
 
             /*

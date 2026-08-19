@@ -61,6 +61,12 @@ class DashboardController extends Controller
                     ->where('lead_status', 'converted')
                     ->count(),
 
+                'bounced_leads' => (clone $query)
+                    ->where('lead_status', 'bounced')
+                    ->count(),
+
+                'bounced_emails' => \App\Models\CampaignLead::where('status', 'bounced')->count(),
+
                 'today_calls' => (clone $query)
                     ->whereDate('last_called_at', $today)
                     ->count(),

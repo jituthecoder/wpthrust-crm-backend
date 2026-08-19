@@ -120,6 +120,11 @@ class SendCampaignLeadJob implements ShouldQueue
 
         $sender = $lead->sender;
 
+        // If pre-assigned sender is inactive or no longer attached to campaign, reset
+        if ($sender && (!$sender->is_active || !\App\Models\CampaignSender::where('email_campaign_id', $lead->email_campaign_id)->where('email_sender_id', $sender->id)->where('is_active', true)->exists())) {
+            $sender = null;
+        }
+
         if (!$sender && $lead->campaign) {
             $senderSelector = app(\App\Services\Email\Campaign\EmailSenderSelectorService::class);
             $selectedCampaignSender = $senderSelector->select($lead);
@@ -129,9 +134,23 @@ class SendCampaignLeadJob implements ShouldQueue
         }
 
         if (!$sender) {
+            $hasActiveCampaignSenders = \App\Models\CampaignSender::where('email_campaign_id', $lead->email_campaign_id)
+                ->where('is_active', true)
+                ->whereHas('sender', function ($q) {
+                    $q->where('is_active', true);
+                })
+                ->exists();
+
+            if ($hasActiveCampaignSenders) {
+                // Active senders are configured but currently at capacity/limits.
+                // Release back to queue to retry in 60s without marking lead as failed.
+                $this->release(60);
+                return;
+            }
+
             $lead->update([
                 'status' => 'failed',
-                'failure_reason' => 'No active email sender available for this campaign lead.',
+                'failure_reason' => 'No active email sender configured for this campaign.',
                 'retry_count' => $lead->retry_count + 1,
             ]);
 
