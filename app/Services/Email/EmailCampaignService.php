@@ -823,7 +823,7 @@ class EmailCampaignService
         $query = $campaign->leads()
             ->with([
                 'business',
-                'sender',
+                'sender.senderAccount',
             ]);
 
         /*
@@ -841,7 +841,7 @@ class EmailCampaignService
 
         /*
         |--------------------------------------------------------------------------
-        | Search
+        | Search (Lead, Email & Failure Reason)
         |--------------------------------------------------------------------------
         */
 
@@ -849,12 +849,24 @@ class EmailCampaignService
 
             $search = trim($filters['search']);
 
-            $query->whereHas('business', function ($q) use ($search) {
-
-                $q->where('business_name', 'LIKE', "%{$search}%")
-                    ->orWhere('email', 'LIKE', "%{$search}%");
-
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('business', function ($b) use ($search) {
+                    $b->where('business_name', 'LIKE', "%{$search}%")
+                        ->orWhere('email', 'LIKE', "%{$search}%");
+                })
+                ->orWhere('failure_reason', 'LIKE', "%{$search}%");
             });
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Error Message Search Filter
+        |--------------------------------------------------------------------------
+        */
+
+        if (!empty($filters['error_search'])) {
+            $errorSearch = trim($filters['error_search']);
+            $query->where('failure_reason', 'LIKE', "%{$errorSearch}%");
         }
 
         /*

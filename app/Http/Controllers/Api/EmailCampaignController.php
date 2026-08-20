@@ -314,6 +314,12 @@ class EmailCampaignController extends Controller
                 'max:255',
             ],
 
+            'error_search' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
             'per_page' => [
                 'nullable',
                 'integer',
