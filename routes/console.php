@@ -10,6 +10,6 @@ Artisan::command('inspire', function () {
 
 Schedule::command('campaigns:recover')->everyMinute()->withoutOverlapping(5);
 Schedule::command('campaigns:process')->everyMinute()->withoutOverlapping(5);
-Schedule::command('psi:fetch --limit=20')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::command('psi:process --concurrency=15 --limit=100')->everyMinute()->withoutOverlapping(15);
 Schedule::command('emails:sync-bounces')->everyFiveMinutes()->withoutOverlapping(10);
 Schedule::command('inbox:sync')->everyFiveMinutes()->withoutOverlapping(10);
