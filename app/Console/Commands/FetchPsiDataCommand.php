@@ -91,6 +91,8 @@ class FetchPsiDataCommand extends Command
 
         $count = 0;
         foreach ($businesses as $b) {
+            $this->line("-> Auditing Business #{$b->id} ({$b->website})...");
+
             BusinessAudit::updateOrCreate(
                 ['business_id' => $b->id],
                 ['psi_status' => 'processing']
