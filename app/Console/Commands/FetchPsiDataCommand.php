@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Jobs\FetchBusinessPsiJob;
 use App\Models\Business;
+use App\Models\BusinessAudit;
 use Illuminate\Console\Command;
 
 class FetchPsiDataCommand extends Command
@@ -47,25 +48,41 @@ class FetchPsiDataCommand extends Command
             return self::SUCCESS;
         }
 
-        // Query businesses that have valid websites and either no audit or pending psi_status (EXCLUDING failed and completed audits)
-        $query = Business::query()
-            ->whereNotNull('website')
-            ->where('website', '!=', '')
-            ->where('website', '!=', '-')
-            ->whereRaw('LOWER(website) != ?', ['n/a'])
-            ->where(function ($q) {
-                $q->whereDoesntHave('audit')
-                  ->orWhereHas('audit', function ($auditQuery) {
-                      $auditQuery->where(function ($sub) {
-                          $sub->where('psi_status', 'pending')
-                              ->orWhereNull('psi_status');
-                      })->whereNull('psi_fetched_at');
-                  });
+        // Priority 1: Query existing audits that are marked 'pending' (indexed & instant)
+        $pendingAudits = BusinessAudit::where('psi_status', 'pending')
+            ->whereHas('business', function ($q) {
+                $q->whereNotNull('website')
+                  ->where('website', '!=', '')
+                  ->where('website', '!=', '-')
+                  ->whereRaw('LOWER(website) != ?', ['n/a']);
             })
-            ->orderBy('id', 'asc')
-            ->limit($limit);
+            ->with('business')
+            ->limit($limit)
+            ->get();
 
-        $businesses = $query->get();
+        $businesses = collect();
+
+        foreach ($pendingAudits as $audit) {
+            if ($audit->business) {
+                $businesses->push($audit->business);
+            }
+        }
+
+        // Priority 2: If limit not reached, query businesses without an audit record
+        if ($businesses->count() < $limit) {
+            $remainingLimit = $limit - $businesses->count();
+            $noAuditBusinesses = Business::whereNotNull('website')
+                ->where('website', '!=', '')
+                ->where('website', '!=', '-')
+                ->whereRaw('LOWER(website) != ?', ['n/a'])
+                ->whereDoesntHave('audit')
+                ->limit($remainingLimit)
+                ->get();
+
+            foreach ($noAuditBusinesses as $b) {
+                $businesses->push($b);
+            }
+        }
 
         if ($businesses->isEmpty()) {
             $this->info("No pending businesses with websites found for PSI auditing.");
@@ -74,6 +91,11 @@ class FetchPsiDataCommand extends Command
 
         $count = 0;
         foreach ($businesses as $b) {
+            BusinessAudit::updateOrCreate(
+                ['business_id' => $b->id],
+                ['psi_status' => 'processing']
+            );
+
             FetchBusinessPsiJob::dispatch($b);
             $count++;
         }

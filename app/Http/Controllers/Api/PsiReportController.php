@@ -178,6 +178,7 @@ class PsiReportController extends Controller
         BusinessAudit::whereIn('business_id', $businessIds)->update([
             'psi_status' => 'pending',
             'psi_error_reason' => null,
+            'psi_fetched_at' => null,
         ]);
 
         // 2. Create audit records for any business missing audit row
@@ -240,6 +241,7 @@ class PsiReportController extends Controller
         $updatedCount = $query->update([
             'psi_status' => 'pending',
             'psi_error_reason' => null,
+            'psi_fetched_at' => null,
         ]);
 
         return response()->json([
