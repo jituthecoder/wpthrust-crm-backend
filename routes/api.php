@@ -296,6 +296,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/inbox/{inboxMessage}', [InboxController::class, 'destroy']);
         Route::post('/inbox/sync', [InboxController::class, 'sync']);
 
+        /*
+        |--------------------------------------------------------------------------
+        | PSI Report
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/psi-report/stats', [\App\Http\Controllers\Api\PsiReportController::class, 'stats']);
+        Route::get('/psi-report', [\App\Http\Controllers\Api\PsiReportController::class, 'index']);
+        Route::post('/psi-report/retry', [\App\Http\Controllers\Api\PsiReportController::class, 'retry']);
+        Route::post('/psi-report/retry-batch', [\App\Http\Controllers\Api\PsiReportController::class, 'retryBatch']);
+
     });
 
 });

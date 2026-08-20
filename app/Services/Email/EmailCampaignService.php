@@ -875,13 +875,15 @@ class EmailCampaignService
 
 
     /**
-     * Retry All Failed Campaign Leads
+     * Retry All Failed Campaign Leads with optional error filter or lead IDs
      */
     public function retryAllFailedLeads(
-        EmailCampaign $campaign
+        EmailCampaign $campaign,
+        ?string $errorFilter = null,
+        ?array $leadIds = null
     ): array {
 
-        return DB::transaction(function () use ($campaign) {
+        return DB::transaction(function () use ($campaign, $errorFilter, $leadIds) {
 
             /*
             |--------------------------------------------------------------------------
@@ -889,13 +891,45 @@ class EmailCampaignService
             |--------------------------------------------------------------------------
             */
 
-            $leads = CampaignLead::where(
+            $query = CampaignLead::where(
                 'email_campaign_id',
                 $campaign->id
             )
-                ->where('status', 'failed')
-                ->whereColumn('retry_count', '<', 'max_retry')
-                ->get();
+                ->where('status', 'failed');
+
+            if (!empty($leadIds)) {
+                $query->whereIn('id', $leadIds);
+            } elseif (!empty($errorFilter)) {
+                $filter = strtolower(trim($errorFilter));
+                if ($filter === 'auth' || $filter === 'oauth') {
+                    $query->where(function ($q) {
+                        $q->where('failure_reason', 'LIKE', '%oauth%')
+                          ->orWhere('failure_reason', 'LIKE', '%microsoft%')
+                          ->orWhere('failure_reason', 'LIKE', '%google%')
+                          ->orWhere('failure_reason', 'LIKE', '%auth%')
+                          ->orWhere('failure_reason', 'LIKE', '%token%')
+                          ->orWhere('failure_reason', 'LIKE', '%credential%');
+                    });
+                } elseif ($filter === 'connection' || $filter === 'smtp') {
+                    $query->where(function ($q) {
+                        $q->where('failure_reason', 'LIKE', '%connection%')
+                          ->orWhere('failure_reason', 'LIKE', '%timeout%')
+                          ->orWhere('failure_reason', 'LIKE', '%expected response code%')
+                          ->orWhere('failure_reason', 'LIKE', '%smtp%');
+                    });
+                } elseif ($filter === 'bounce') {
+                    $query->where(function ($q) {
+                        $q->where('failure_reason', 'LIKE', '%bounce%')
+                          ->orWhere('failure_reason', 'LIKE', '%rejected%')
+                          ->orWhere('failure_reason', 'LIKE', '%mailbox%')
+                          ->orWhere('failure_reason', 'LIKE', '%does not exist%');
+                    });
+                } else {
+                    $query->where('failure_reason', 'LIKE', "%{$filter}%");
+                }
+            }
+
+            $leads = $query->get();
 
             /*
             |--------------------------------------------------------------------------

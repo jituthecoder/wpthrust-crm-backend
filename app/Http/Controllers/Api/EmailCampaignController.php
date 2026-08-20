@@ -370,12 +370,18 @@ class EmailCampaignController extends Controller
      * Retry All Failed Campaign Leads
      */
     public function retryAllFailedLeads(
+        Request $request,
         EmailCampaign $emailCampaign
     ) {
         $this->authorizeTenant($emailCampaign);
 
+        $errorFilter = $request->input('error_filter');
+        $leadIds = $request->input('lead_ids');
+
         $result = $this->service->retryAllFailedLeads(
-            $emailCampaign
+            $emailCampaign,
+            $errorFilter,
+            is_array($leadIds) ? $leadIds : null
         );
 
         return response()->json([
@@ -383,8 +389,8 @@ class EmailCampaignController extends Controller
             'success' => true,
 
             'message' => $result['queued'] > 0
-                ? 'Failed campaign leads queued for retry.'
-                : 'No failed leads available for retry.',
+                ? "{$result['queued']} failed lead(s) queued for retry."
+                : 'No failed leads matched criteria for retry.',
 
             'data' => [
 

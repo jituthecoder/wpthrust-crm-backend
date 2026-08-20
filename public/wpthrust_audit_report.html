@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WPThrust Website Performance Audit - sreedharscce.com</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #eff6ff;
+            --dark-bg: #0f172a;
+            --dark-card: #1e293b;
+            --text-main: #334155;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --score-poor: #ef4444;
+            --score-poor-bg: #fef2f2;
+            --score-poor-border: #fca5a5;
+            --score-avg: #f59e0b;
+            --score-avg-bg: #fffbeb;
+            --score-avg-border: #fcd34d;
+            --score-good: #10b981;
+            --score-good-bg: #ecfdf5;
+            --score-good-border: #6ee7b7;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.05);
+            --shadow-lg: 0 10px 25px rgba(15,23,42,0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f8fafc;
+            color: var(--text-main);
+            line-height: 1.5;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .no-print-bar {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+            color: white;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+
+        .no-print-bar .brand-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .no-print-bar .brand-title i {
+            color: #38bdf8;
+        }
+
+        .btn-print {
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+        }
+
+        .btn-print:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.5);
+        }
+
+        .report-page {
+            max-width: 1000px;
+            margin: 30px auto;
+            background: #ffffff;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .report-header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #ffffff;
+            padding: 40px 48px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 20px;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #2563eb, #38bdf8);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            color: white;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+
+        .logo-text {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: white;
+        }
+
+        .logo-text span {
+            color: #38bdf8;
+        }
+
+        .audit-badge {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #38bdf8;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-body h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
+            color: #ffffff;
+        }
+
+        .meta-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 16px 24px;
+            border-radius: var(--radius-md);
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            color: #cbd5e1;
+        }
+
+        .meta-item i {
+            color: #38bdf8;
+        }
+
+        .meta-item strong {
+            color: #ffffff;
+        }
+
+        .report-body {
+            padding: 40px 48px;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--dark-bg);
+            margin-bottom: 24px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary-light);
+        }
+
+        .section-title i {
+            color: var(--primary);
+        }
+
+        .scores-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .score-card {
+            border-radius: var(--radius-md);
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border: 1px solid;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .score-card.poor {
+            background-color: var(--score-poor-bg);
+            border-color: var(--score-poor-border);
+        }
+
+        .score-card.avg {
+            background-color: var(--score-avg-bg);
+            border-color: var(--score-avg-border);
+        }
+
+        .score-circle-wrapper {
+            position: relative;
+            width: 90px;
+            height: 90px;
+            flex-shrink: 0;
+        }
+
+        .score-circle-svg {
+            transform: rotate(-90deg);
+            width: 100%;
+            height: 100%;
+        }
+
+        .score-circle-bg {
+            fill: none;
+            stroke-width: 8;
+            stroke: rgba(0,0,0,0.06);
+        }
+
+        .score-circle-progress {
+            fill: none;
+            stroke-width: 8;
+            stroke-linecap: round;
+        }
+
+        .poor .score-circle-progress { stroke: var(--score-poor); }
+        .avg .score-circle-progress { stroke: var(--score-avg); }
+
+        .score-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .score-num {
+            font-size: 1.6rem;
+            font-weight: 800;
+            line-height: 1;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .poor .score-num { color: var(--score-poor); }
+        .avg .score-num { color: var(--score-avg); }
+
+        .score-max {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .score-info {
+            flex: 1;
+        }
+
+        .score-device {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .score-status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+
+        .poor .score-status-badge {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--score-poor);
+        }
+
+        .avg .score-status-badge {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--score-avg);
+        }
+
+        .metrics-comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .metrics-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .metrics-header {
+            padding: 14px 20px;
+            background: #f1f5f9;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--dark-bg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .metrics-list {
+            padding: 12px 20px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px dashed var(--border-color);
+            font-size: 0.875rem;
+        }
+
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+
+        .metric-name {
+            color: var(--text-main);
+            font-weight: 500;
+        }
+
+        .metric-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        .val-poor { background: var(--score-poor-bg); color: var(--score-poor); border: 1px solid var(--score-poor-border); }
+        .val-avg { background: var(--score-avg-bg); color: var(--score-avg); border: 1px solid var(--score-avg-border); }
+        .val-good { background: var(--score-good-bg); color: var(--score-good); border: 1px solid var(--score-good-border); }
+        .val-neutral { background: #f1f5f9; color: var(--text-muted); }
+
+        .opp-card-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .opp-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius-sm);
+            padding: 16px 20px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .opp-card.high-impact { border-left-color: var(--score-poor); }
+        .opp-card.med-impact { border-left-color: var(--score-avg); }
+
+        .opp-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .opp-title {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--dark-bg);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .high-impact .opp-title i { color: var(--score-poor); }
+        .med-impact .opp-title i { color: var(--score-avg); }
+
+        .opp-savings {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            white-space: nowrap;
+        }
+
+        .savings-high { background: var(--score-poor-bg); color: var(--score-poor); border: 1px solid var(--score-poor-border); }
+        .savings-med { background: var(--score-avg-bg); color: var(--score-avg); border: 1px solid var(--score-avg-border); }
+
+        .opp-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .recommendation-box {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #ffffff;
+            border-radius: var(--radius-md);
+            padding: 32px;
+            position: relative;
+            overflow: hidden;
+            margin-top: 40px;
+            margin-bottom: 40px;
+        }
+
+        .rec-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .rec-header i { font-size: 24px; color: #38bdf8; }
+        .rec-header h3 { font-size: 1.25rem; font-weight: 700; }
+
+        .rec-body {
+            font-size: 0.95rem;
+            color: #cbd5e1;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .rec-cta-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 16px 20px;
+            border-radius: var(--radius-sm);
+        }
+
+        .contact-details {
+            display: flex;
+            gap: 20px;
+            font-size: 0.875rem;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #e2e8f0;
+        }
+
+        .contact-item i { color: #38bdf8; }
+
+        .cta-button {
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-weight: 700;
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .report-footer {
+            border-top: 1px solid var(--border-color);
+            padding: 24px 48px;
+            background: #f8fafc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        @media print {
+            .no-print-bar { display: none !important; }
+            body { background: white; }
+            .report-page { max-width: 100%; margin: 0; box-shadow: none; border: none; }
+            .scores-grid, .metrics-comparison-grid, .opp-card, .recommendation-box { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="no-print-bar">
+        <div class="brand-title">
+            <i class="fa-solid fa-gauge-high"></i>
+            <span>WPThrust Website Performance Audit</span>
+        </div>
+        <button class="btn-print" onclick="window.print()">
+            <i class="fa-solid fa-print"></i>
+            <span>Print or Save PDF</span>
+        </button>
+    </div>
+
+    <div class="report-page">
+        <header class="report-header">
+            <div class="header-top">
+                <div class="logo-container">
+                    <div class="logo-icon"><i class="fa-solid fa-bolt"></i></div>
+                    <div class="logo-text">WP<span>Thrust</span></div>
+                </div>
+                <div class="audit-badge">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Official Audit Report</span>
+                </div>
+            </div>
+
+            <div class="header-body">
+                <h1>Website Performance Audit</h1>
+                <div class="meta-grid">
+                    <div class="meta-item">
+                        <i class="fa-solid fa-globe"></i>
+                        <span>Target: <strong>https://sreedharscce.com/</strong></span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fa-regular fa-calendar-check"></i>
+                        <span>Generated: <strong>20 Aug 2026 06:28 UTC</strong></span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fa-solid fa-server"></i>
+                        <span>Engine: <strong>WPThrust Lighthouse v11.0</strong></span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="report-body">
+            
+            <section>
+                <div class="section-title">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Executive Performance Overview</span>
+                </div>
+
+                <div class="scores-grid">
+                    <div class="score-card avg">
+                        <div class="score-circle-wrapper">
+                            <svg class="score-circle-svg" viewBox="0 0 36 36">
+                                <path class="score-circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                <path class="score-circle-progress" stroke-dasharray="52, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            </svg>
+                            <div class="score-value">
+                                <div class="score-num">52</div>
+                                <div class="score-max">/ 100</div>
+                            </div>
+                        </div>
+                        <div class="score-info">
+                            <div class="score-device"><i class="fa-solid fa-mobile-screen-button me-1"></i> Mobile Score</div>
+                            <h3 style="font-size: 1.1rem; font-weight: 800; color: #92400e;">52 / 100</h3>
+                            <span class="score-status-badge">Needs Improvement</span>
+                        </div>
+                    </div>
+
+                    <div class="score-card poor">
+                        <div class="score-circle-wrapper">
+                            <svg class="score-circle-svg" viewBox="0 0 36 36">
+                                <path class="score-circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                <path class="score-circle-progress" stroke-dasharray="47, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            </svg>
+                            <div class="score-value">
+                                <div class="score-num">47</div>
+                                <div class="score-max">/ 100</div>
+                            </div>
+                        </div>
+                        <div class="score-info">
+                            <div class="score-device"><i class="fa-solid fa-desktop me-1"></i> Desktop Score</div>
+                            <h3 style="font-size: 1.1rem; font-weight: 800; color: #991b1b;">47 / 100</h3>
+                            <span class="score-status-badge">Poor Performance</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <div class="section-title">
+                    <i class="fa-solid fa-stopwatch"></i>
+                    <span>Core Web Vitals & Performance Metrics</span>
+                </div>
+
+                <div class="metrics-comparison-grid">
+                    <div class="metrics-card">
+                        <div class="metrics-header">
+                            <span><i class="fa-solid fa-mobile-screen me-2"></i> Mobile Metrics</span>
+                            <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Emulated Moto G4</span>
+                        </div>
+                        <div class="metrics-list">
+                            <div class="metric-row">
+                                <span class="metric-name">First Contentful Paint (FCP)</span>
+                                <span class="metric-value val-poor">4.9 s</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-name">Largest Contentful Paint (LCP)</span>
+                                <span class="metric-value val-poor">37.4 s</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-name">Time to Interactive (TTI)</span>
+                                <span class="metric-value val-poor">39.8 s</span>
+                            </div>
+                            <div className="metric-row">
+                                <span className="metric-name">Total Blocking Time (TBT)</span>
+                                <span className="metric-value val-avg">250 ms</span>
+                            </div>
+                            <div className="metric-row">
+                                <span className="metric-name">Cumulative Layout Shift (CLS)</span>
+                                <span className="metric-value val-neutral">N/A</span>
+                            </div>
+                            <div className="metric-row">
+                                <span className="metric-name">Speed Index</span>
+                                <span className="metric-value val-poor">11.1 s</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="metrics-card">
+                        <div className="metrics-header">
+                            <span><i class="fa-solid fa-desktop me-2"></i> Desktop Metrics</span>
+                            <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">High-Speed Desktop</span>
+                        </div>
+                        <div className="metrics-list">
+                            <div className="metric-row">
+                                <span className="metric-name">First Contentful Paint (FCP)</span>
+                                <span className="metric-value val-avg">1.6 s</span>
+                            </div>
+                            <div className="metric-row">
+                                <span className="metric-name">Largest Contentful Paint (LCP)</span>
+                                <span className="metric-value val-avg">2.3 s</span>
+                            </div>
+                            <div className="metric-row">
+                                <span className="metric-name">Time to Interactive (TTI)</span>
+                                <span className="metric-value val-avg">3.9 s</span>
+                            </div>
+                            <div className="metric-row">
+                                <span className="metric-name">Total Blocking Time (TBT)</span>
+                                <span className="metric-value val-poor">890 ms</span>
+                            </div>
+                            <div className="metric-row">
+                                <span className="metric-name">Cumulative Layout Shift (CLS)</span>
+                                <span className="metric-value val-neutral">N/A</span>
+                            </div>
+                            <div className="metric-row">
+                                <span className="metric-name">Speed Index</span>
+                                <span className="metric-value val-avg">3.7 s</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section className="opp-section">
+                <div class="section-title">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>Top Performance Opportunities (Mobile & Desktop)</span>
+                </div>
+
+                <div class="opp-card-list">
+                    <div class="opp-card high-impact">
+                        <div class="opp-header">
+                            <div class="opp-title">
+                                <i class="fa-solid fa-weight-hanging"></i>
+                                <span>Avoid Enormous Network Payloads</span>
+                            </div>
+                            <span class="opp-savings savings-high">Total Size: 17,394 KiB</span>
+                        </div>
+                        <div class="opp-desc">
+                            Large network payloads cost users real money and are directly correlated with high bounce rates and slow load times. Optimize image compression and defer heavy JavaScript assets.
+                        </div>
+                    </div>
+
+                    <div class="opp-card high-impact">
+                        <div class="opp-header">
+                            <div class="opp-title">
+                                <i class="fa-solid fa-hourglass-half"></i>
+                                <span>Time to Interactive (TTI) Optimization</span>
+                            </div>
+                            <span class="opp-savings savings-high">Delay: 39.8s (Mobile)</span>
+                        </div>
+                        <div class="opp-desc">
+                            Main-thread parsing and execution take 39.8s on mobile before the user can reliably interact with form controls or buttons.
+                        </div>
+                    </div>
+
+                    <div class="opp-card high-impact">
+                        <div class="opp-header">
+                            <div class="opp-title">
+                                <i class="fa-solid fa-ban"></i>
+                                <span>Eliminate Render-Blocking Requests</span>
+                            </div>
+                            <span class="opp-savings savings-high">Est. Savings: 600 ms</span>
+                        </div>
+                        <div class="opp-desc">
+                            Requests are blocking the page’s initial render, delaying Largest Contentful Paint (LCP). Inline critical CSS and defer non-essential scripts.
+                        </div>
+                    </div>
+
+                    <div class="opp-card med-impact">
+                        <div class="opp-header">
+                            <div class="opp-title">
+                                <i class="fa-solid fa-image"></i>
+                                <span>Image Elements Lack Explicit Width & Height</span>
+                            </div>
+                            <span class="opp-savings savings-med">CLS Risk</span>
+                        </div>
+                        <div class="opp-desc">
+                            Set explicit <code>width</code> and <code>height</code> attributes on image elements to reserve vertical aspect ratios and eliminate Cumulative Layout Shifts.
+                        </div>
+                    </div>
+
+                    <div class="opp-card med-impact">
+                        <div class="opp-header">
+                            <div class="opp-title">
+                                <i class="fa-solid fa-network-wired"></i>
+                                <span>Document Request Latency</span>
+                            </div>
+                            <span class="opp-savings savings-med">Est. Savings: 430 ms</span>
+                        </div>
+                        <div class="opp-desc">
+                            Initial HTML server latency is high. Enable Gzip/Brotli compression, optimize database queries, and implement server-level caching.
+                        </div>
+                    </div>
+
+                    <div class="opp-card med-impact">
+                        <div class="opp-header">
+                            <div class="opp-title">
+                                <i class="fa-solid fa-font"></i>
+                                <span>Font Display Optimization</span>
+                            </div>
+                            <span class="opp-savings savings-med">Est. Savings: 380 ms</span>
+                        </div>
+                        <div class="opp-desc">
+                            Leverage <code>font-display: swap</code> to ensure text is immediately visible during custom webfont load.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="recommendation-box">
+                <div class="rec-header">
+                    <i class="fa-solid fa-rocket"></i>
+                    <h3>WPThrust Recommendation & Next Steps</h3>
+                </div>
+                <div class="rec-body">
+                    Your current PageSpeed score (<strong>Mobile 52/100, Desktop 47/100</strong>) indicates significant speed bottlenecks caused by uncompressed 17.3MB payloads, render-blocking scripts, and delayed TTI. 
+                    <br><br>
+                    <strong>WPThrust</strong> specializes in speed optimization for WordPress websites. We can optimize your hosting environment, implement advanced object caching, compress scripts/styles, optimize fonts, and tune Core Web Vitals to achieve <strong>90+ PageSpeed Scores</strong> without breaking design or functionality.
+                </div>
+
+                <div class="rec-cta-bar">
+                    <div class="contact-details">
+                        <div class="contact-item">
+                            <i class="fa-solid fa-envelope"></i>
+                            <span>info@wpthrust.in</span>
+                        </div>
+                        <div class="contact-item">
+                            <i class="fa-solid fa-phone"></i>
+                            <span>+97-8521492824</span>
+                        </div>
+                        <div class="contact-item">
+                            <i class="fa-solid fa-globe"></i>
+                            <span>https://wpthrust.in/</span>
+                        </div>
+                    </div>
+                    <a href="https://wpthrust.in/" target="_blank" class="cta-button">
+                        <span>Get 90+ Speed Optimization</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </a>
+                </div>
+            </section>
+
+        </main>
+
+        <footer class="report-footer">
+            <div>
+                Generated automatically by <span class="footer-brand">WPThrust CRM & Performance Audit Engine</span>
+            </div>
+            <div>
+                © 2026 WPThrust. All rights reserved. | <a href="https://wpthrust.in" style="color: #2563eb; text-decoration: none; font-weight: 600;">wpthrust.in</a>
+            </div>
+        </footer>
+    </div>
+
+</body>
+</html>
