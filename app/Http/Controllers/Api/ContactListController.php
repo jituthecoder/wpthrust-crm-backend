@@ -81,7 +81,17 @@ class ContactListController extends Controller
             // 2. Filter criteria based business query
             if (!empty($request->filter_criteria) && is_array($request->filter_criteria)) {
                 $criteria = $request->filter_criteria;
-                $query = Business::with('audit')->whereNotNull('email')->where('email', '!=', '');
+                $query = Business::with('audit');
+
+                // Has Email Filter
+                $hasEmailOpt = $criteria['has_email'] ?? 'yes';
+                if ($hasEmailOpt === 'yes') {
+                    $query->whereNotNull('email')->where('email', '!=', '')->where('email', '!=', '-');
+                } elseif ($hasEmailOpt === 'no') {
+                    $query->where(function ($q) {
+                        $q->whereNull('email')->orWhere('email', '')->orWhere('email', '-');
+                    });
+                }
 
                 if (!empty($criteria['search'])) {
                     $search = trim($criteria['search']);
@@ -127,6 +137,30 @@ class ContactListController extends Controller
                     if ($criteria['has_screenshot'] === 'yes') {
                         $query->whereHas('audit', function ($q) {
                             $q->whereNotNull('mobile_screenshot_path');
+                        });
+                    }
+                }
+
+                if (!empty($criteria['has_opened'])) {
+                    if ($criteria['has_opened'] === 'yes') {
+                        $query->whereHas('campaignLeads', function ($q) {
+                            $q->whereNotNull('opened_at')->orWhereIn('status', ['opened', 'clicked']);
+                        });
+                    } elseif ($criteria['has_opened'] === 'no') {
+                        $query->whereDoesntHave('campaignLeads', function ($q) {
+                            $q->whereNotNull('opened_at')->orWhereIn('status', ['opened', 'clicked']);
+                        });
+                    }
+                }
+
+                if (!empty($criteria['has_clicked'])) {
+                    if ($criteria['has_clicked'] === 'yes') {
+                        $query->whereHas('campaignLeads', function ($q) {
+                            $q->whereNotNull('clicked_at')->orWhere('status', 'clicked');
+                        });
+                    } elseif ($criteria['has_clicked'] === 'no') {
+                        $query->whereDoesntHave('campaignLeads', function ($q) {
+                            $q->whereNotNull('clicked_at')->orWhere('status', 'clicked');
                         });
                     }
                 }

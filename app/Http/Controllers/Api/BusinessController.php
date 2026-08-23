@@ -148,6 +148,66 @@ class BusinessController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Has Email Filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('has_email')) {
+            if ($request->has_email === 'yes') {
+                $query->whereNotNull('email')
+                      ->where('email', '!=', '')
+                      ->where('email', '!=', '-');
+            } elseif ($request->has_email === 'no') {
+                $query->where(function ($q) {
+                    $q->whereNull('email')
+                      ->orWhere('email', '')
+                      ->orWhere('email', '-');
+                });
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Has Opened Email Filter (Any campaign/sender in system)
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('has_opened')) {
+            if ($request->has_opened === 'yes') {
+                $query->whereHas('campaignLeads', function ($q) {
+                    $q->whereNotNull('opened_at')
+                      ->orWhereIn('status', ['opened', 'clicked']);
+                });
+            } elseif ($request->has_opened === 'no') {
+                $query->whereDoesntHave('campaignLeads', function ($q) {
+                    $q->whereNotNull('opened_at')
+                      ->orWhereIn('status', ['opened', 'clicked']);
+                });
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Has Clicked Email Filter (Any campaign/sender in system)
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('has_clicked')) {
+            if ($request->has_clicked === 'yes') {
+                $query->whereHas('campaignLeads', function ($q) {
+                    $q->whereNotNull('clicked_at')
+                      ->orWhere('status', 'clicked');
+                });
+            } elseif ($request->has_clicked === 'no') {
+                $query->whereDoesntHave('campaignLeads', function ($q) {
+                    $q->whereNotNull('clicked_at')
+                      ->orWhere('status', 'clicked');
+                });
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | Assigned Filter
         |--------------------------------------------------------------------------
         */
