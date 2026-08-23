@@ -249,25 +249,13 @@ class EmailCampaignController extends Controller
         $this->authorizeTenant($emailCampaign);
 
         return response()->json([
-
             'success' => true,
-
             'data' => $emailCampaign->load([
-
                 'template.currentVersion',
-
                 'sequenceSteps.template',
-
                 'creator',
-
                 'senders.sender',
-
-                'leads.business',
-
-                'leads.stepExecutions',
-
             ])
-
         ]);
     }
 
