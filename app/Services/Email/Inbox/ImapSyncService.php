@@ -53,6 +53,9 @@ class ImapSyncService
 
             $sender->update(['last_sync_at' => now()]);
 
+            // Auto-clean any duplicate messages for this sender account
+            self::deduplicateMessages($sender->id);
+
             return [
                 'success' => true,
                 'sender_id' => $sender->id,
@@ -351,18 +354,54 @@ class ImapSyncService
      */
     protected function storeMessageAndProcess(EmailSender $sender, array $parsed): array
     {
-        // Check for existing duplicate message
+        // Multi-layer duplicate check
         $existing = null;
+
+        // 1. Check Message-ID (raw, clean without brackets, or provider ID)
         if (!empty($parsed['message_id'])) {
-            $existing = InboxMessage::where('message_id', $parsed['message_id'])->first();
+            $rawMsgId = trim($parsed['message_id']);
+            $cleanMsgId = trim($rawMsgId, '<> ');
+
+            $existing = InboxMessage::where(function($q) use ($rawMsgId, $cleanMsgId) {
+                $q->where('message_id', $rawMsgId)
+                  ->orWhere('message_id', $cleanMsgId)
+                  ->orWhere('message_id', "<{$cleanMsgId}>");
+            })->first();
         }
+
+        // 2. Fallback check: Same sender, same from_email, same subject, and matching snippet/timestamp window
         if (!$existing && !empty($parsed['from_email']) && !empty($parsed['subject'])) {
-            $existing = InboxMessage::where('email_sender_id', $sender->id)
-                ->where('from_email', strtolower($parsed['from_email']))
-                ->where('to_email', strtolower($parsed['to_email']))
-                ->where('subject', $parsed['subject'])
-                ->where('received_at', $parsed['received_at'] ?? now())
-                ->first();
+            $cleanFrom = strtolower(trim($parsed['from_email']));
+            $cleanSubj = trim($parsed['subject']);
+            $cleanSnippet = strtolower(trim(substr($parsed['snippet'] ?? $parsed['body_text'] ?? '', 0, 80)));
+
+            $query = InboxMessage::where('email_sender_id', $sender->id)
+                ->whereRaw('LOWER(from_email) = ?', [$cleanFrom])
+                ->where('subject', $cleanSubj);
+
+            if (!empty($parsed['received_at'])) {
+                $recTime = strtotime($parsed['received_at']);
+                if ($recTime > 0) {
+                    $query->whereBetween('received_at', [
+                        date('Y-m-d H:i:s', $recTime - 172800),
+                        date('Y-m-d H:i:s', $recTime + 172800),
+                    ]);
+                }
+            }
+
+            $candidates = $query->get();
+            foreach ($candidates as $cand) {
+                if (!empty($cleanSnippet)) {
+                    $candSnippet = strtolower(trim(substr($cand->snippet ?? $cand->body_text ?? '', 0, 80)));
+                    if (empty($candSnippet) || $candSnippet === $cleanSnippet || str_contains($candSnippet, substr($cleanSnippet, 0, 40))) {
+                        $existing = $cand;
+                        break;
+                    }
+                } else {
+                    $existing = $cand;
+                    break;
+                }
+            }
         }
 
         if ($existing) {
@@ -461,5 +500,52 @@ class ImapSyncService
             $body = quoted_printable_decode($body);
         }
         return mb_convert_encoding($body, 'UTF-8', 'UTF-8');
+    }
+
+    /**
+     * Deduplicate existing messages in inbox_messages table.
+     */
+    public static function deduplicateMessages(?int $senderId = null): int
+    {
+        $query = InboxMessage::query();
+        if ($senderId) {
+            $query->where('email_sender_id', $senderId);
+        }
+
+        $messages = $query->orderBy('id', 'asc')->get();
+        $seenMsgIds = [];
+        $seenSignatures = [];
+        $deletedCount = 0;
+
+        foreach ($messages as $msg) {
+            // Check 1: Duplicate Message-ID
+            if (!empty($msg->message_id)) {
+                $cleanId = trim($msg->message_id, '<> ');
+                if (isset($seenMsgIds[$cleanId])) {
+                    $msg->delete();
+                    $deletedCount++;
+                    continue;
+                }
+                $seenMsgIds[$cleanId] = $msg->id;
+            }
+
+            // Check 2: Content Signature (sender_id + from_email + to_email + subject + snippet + date)
+            $cleanSubj = strtolower(trim($msg->subject ?? ''));
+            $cleanFrom = strtolower(trim($msg->from_email ?? ''));
+            $cleanTo = strtolower(trim($msg->to_email ?? ''));
+            $cleanSnippet = strtolower(trim(substr($msg->snippet ?? $msg->body_text ?? '', 0, 80)));
+            $dateDay = $msg->received_at ? date('Y-m-d', strtotime($msg->received_at)) : 'nodate';
+
+            $signature = implode('|', [$msg->email_sender_id, $cleanFrom, $cleanTo, $cleanSubj, $cleanSnippet, $dateDay]);
+
+            if (isset($seenSignatures[$signature])) {
+                $msg->delete();
+                $deletedCount++;
+            } else {
+                $seenSignatures[$signature] = $msg->id;
+            }
+        }
+
+        return $deletedCount;
     }
 }

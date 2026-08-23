@@ -62,10 +62,22 @@ class DashboardController extends Controller
                     ->count(),
 
                 'bounced_leads' => (clone $query)
-                    ->where('lead_status', 'bounced')
+                    ->where(function ($q) {
+                        $q->where('lead_status', 'bounced')
+                          ->orWhere('is_bounced', true)
+                          ->orWhereNotNull('bounced_at');
+                    })
                     ->count(),
 
-                'bounced_emails' => \App\Models\CampaignLead::where('status', 'bounced')->count(),
+                'bounced_emails' => max(
+                    \App\Models\CampaignLead::where('status', 'bounced')->orWhereNotNull('bounced_at')->count(),
+                    \App\Models\InboxMessage::where('folder', 'bounce')->count(),
+                    (clone $query)->where(function ($q) {
+                        $q->where('lead_status', 'bounced')
+                          ->orWhere('is_bounced', true)
+                          ->orWhereNotNull('bounced_at');
+                    })->count()
+                ),
 
                 'today_calls' => (clone $query)
                     ->whereDate('last_called_at', $today)

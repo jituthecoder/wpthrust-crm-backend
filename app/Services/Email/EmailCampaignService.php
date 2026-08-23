@@ -668,6 +668,50 @@ class EmailCampaignService
         $clickRate = $sent > 0 ? round(($clickedCount / $sent) * 100, 1) : 0.0;
         $unsubscribeRate = $sent > 0 ? round(($unsubscribedCount / $sent) * 100, 1) : 0.0;
 
+        /*
+        |--------------------------------------------------------------------------
+        | Per-Sender Breakdown Statistics
+        |--------------------------------------------------------------------------
+        */
+        $senderStats = [];
+        $campaignSenders = $campaign->senders()->with('sender')->get();
+
+        foreach ($campaignSenders as $cs) {
+            $senderObj = $cs->sender;
+            if (!$senderObj) continue;
+
+            $sId = $senderObj->id;
+            $sSent = $campaign->leads()->where('email_sender_id', $sId)->whereIn('status', ['sent', 'opened', 'clicked'])->count();
+            $sOpened = $campaign->leads()->where('email_sender_id', $sId)->whereNotNull('opened_at')->count();
+            $sClicked = $campaign->leads()->where('email_sender_id', $sId)->whereNotNull('clicked_at')->count();
+            $sUnsubscribed = $campaign->leads()->where('email_sender_id', $sId)->where(function($q) {
+                $q->where('status', 'unsubscribed')->orWhereNotNull('unsubscribed_at');
+            })->count();
+            $sBounced = $campaign->leads()->where('email_sender_id', $sId)->where(function($q) {
+                $q->where('status', 'bounced')->orWhereNotNull('bounced_at');
+            })->count();
+            $sFailed = $campaign->leads()->where('email_sender_id', $sId)->where('status', 'failed')->count();
+
+            $sOpenRate = $sSent > 0 ? round(($sOpened / $sSent) * 100, 1) : 0.0;
+            $sClickRate = $sSent > 0 ? round(($sClicked / $sSent) * 100, 1) : 0.0;
+
+            $senderStats[] = [
+                'sender_id' => $senderObj->id,
+                'name' => $senderObj->name,
+                'email' => $senderObj->email,
+                'display_name' => $senderObj->display_name,
+                'provider' => $senderObj->provider,
+                'sent' => $sSent,
+                'opened' => $sOpened,
+                'open_rate' => $sOpenRate,
+                'clicked' => $sClicked,
+                'click_rate' => $sClickRate,
+                'unsubscribed' => $sUnsubscribed,
+                'bounced' => $sBounced,
+                'failed' => $sFailed,
+            ];
+        }
+
         return [
 
             'campaign_id' => $campaign->id,
@@ -697,6 +741,10 @@ class EmailCampaignService
             'clicked_count' => $clickedCount,
 
             'open_rate' => $openRate,
+
+            'click_rate' => $clickRate,
+
+            'sender_stats' => $senderStats,
 
             'click_rate' => $clickRate,
 

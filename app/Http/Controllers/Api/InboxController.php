@@ -200,10 +200,16 @@ class InboxController extends Controller
             }
         }
 
+        $removedDuplicates = ImapSyncService::deduplicateMessages($senderId ? (int)$senderId : null);
+
         $targetName = (count($syncedSenders) === 1) ? $syncedSenders[0] : (count($syncedSenders) . ' active senders');
         $msg = ($synced > 0 || $bounces > 0)
             ? "Synced {$synced} new message(s) for {$targetName}."
             : "Mailbox for {$targetName} is up to date.";
+
+        if ($removedDuplicates > 0) {
+            $msg .= " Cleaned up {$removedDuplicates} duplicate message(s).";
+        }
 
         return response()->json([
             'success' => true,
