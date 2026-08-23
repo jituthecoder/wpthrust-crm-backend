@@ -89,10 +89,14 @@ class Business extends Model
         return $this->hasOne(BusinessAudit::class);
     }
 
-   public function activities(): HasMany
+    public function activities(): HasMany
     {
         return $this->hasMany(LeadActivity::class)
             ->latest();
     }
-    
+
+    public function campaignLeads(): HasMany
+    {
+        return $this->hasMany(CampaignLead::class, 'business_id');
+    }
 }
