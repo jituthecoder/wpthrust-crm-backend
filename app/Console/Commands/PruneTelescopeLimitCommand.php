@@ -13,14 +13,14 @@ class PruneTelescopeLimitCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'telescope:prune-limit {--limit=5000 : Maximum entries to keep} {--hours= : Also prune entries older than X hours}';
+    protected $signature = 'telescope:prune-limit {--limit=5000 : Maximum entries to keep} {--hours= : Also prune entries older than X hours} {--clear : Truncate all Telescope entries immediately}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Limit Laravel Telescope entries to the last N records to prevent database bloat and server crashes.';
+    protected $description = 'Limit or clear Laravel Telescope entries to prevent database bloat and server crashes.';
 
     /**
      * Execute the console command.
@@ -29,6 +29,18 @@ class PruneTelescopeLimitCommand extends Command
     {
         if (!Schema::hasTable('telescope_entries')) {
             $this->warn('telescope_entries table does not exist.');
+            return 0;
+        }
+
+        if ($this->option('clear')) {
+            if (Schema::hasTable('telescope_entries_tags')) {
+                DB::table('telescope_entries_tags')->truncate();
+            }
+            if (Schema::hasTable('telescope_monitoring')) {
+                DB::table('telescope_monitoring')->truncate();
+            }
+            DB::table('telescope_entries')->truncate();
+            $this->info('All Telescope database tables truncated cleanly.');
             return 0;
         }
 

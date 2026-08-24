@@ -16,11 +16,11 @@ return [
     |
     */
 
-    'enabled' => env('TELESCOPE_ENABLED', true),
+    'enabled' => env('TELESCOPE_ENABLED', false),
 
-    'allow_all' => env('TELESCOPE_ALLOW_ALL', true),
+    'allow_all' => env('TELESCOPE_ALLOW_ALL', false),
 
-    'record_all' => env('TELESCOPE_RECORD_ALL', true),
+    'record_all' => env('TELESCOPE_RECORD_ALL', false),
 
     /*
     |--------------------------------------------------------------------------

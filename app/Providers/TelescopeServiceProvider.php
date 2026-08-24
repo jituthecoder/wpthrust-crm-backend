@@ -23,6 +23,10 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
         $recordAll = config('telescope.record_all', env('TELESCOPE_RECORD_ALL', true));
 
         Telescope::filter(function (IncomingEntry $entry) use ($isLocal, $recordAll) {
+            if (!config('telescope.enabled', false)) {
+                return false;
+            }
+
             return $isLocal ||
                    $recordAll ||
                    $entry->isReportableException() ||
