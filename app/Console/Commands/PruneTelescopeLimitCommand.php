@@ -52,24 +52,33 @@ class PruneTelescopeLimitCommand extends Command
             $this->info("Pruned {$hoursDeleted} entries older than {$hours} hours.");
         }
 
-        // 2. Enforce strict max record limit (keep newest $limit records)
-        $currentCount = DB::table('telescope_entries')->count();
+        // 2. Enforce strict max record limit (keep newest $limit records) in chunks
+        while (true) {
+            $currentCount = DB::table('telescope_entries')->count();
+            if ($currentCount <= $limit) {
+                break;
+            }
 
-        if ($currentCount > $limit) {
-            // Find the sequence of the Nth newest record (ordered by sequence DESC)
             $sequenceCutoff = DB::table('telescope_entries')
                 ->orderBy('sequence', 'desc')
                 ->skip($limit - 1)
                 ->take(1)
                 ->value('sequence');
 
-            if ($sequenceCutoff) {
-                $limitDeleted = DB::table('telescope_entries')
-                    ->where('sequence', '<', $sequenceCutoff)
-                    ->delete();
-                $deleted += $limitDeleted;
-                $this->info("Pruned {$limitDeleted} entries exceeding the {$limit} record limit.");
+            if (!$sequenceCutoff) {
+                break;
             }
+
+            $limitDeleted = DB::table('telescope_entries')
+                ->where('sequence', '<', $sequenceCutoff)
+                ->limit(5000)
+                ->delete();
+
+            if ($limitDeleted === 0) {
+                break;
+            }
+
+            $deleted += $limitDeleted;
         }
 
         // 3. Clean up orphaned tags in telescope_entries_tags if table exists

@@ -35,6 +35,13 @@ class TemplateVariableService
 
             [
                 'group' => 'Business',
+                'key' => 'domain',
+                'variable' => '{{domain}}',
+                'label' => 'Domain Name Only (e.g. laserclinics.com.au)',
+            ],
+
+            [
+                'group' => 'Business',
                 'key' => 'email',
                 'variable' => '{{email}}',
                 'label' => 'Email',
@@ -287,6 +294,7 @@ class TemplateVariableService
 
         // Clean website URL: strip query parameters (?utm_source=...), fragments, and leading protocol
         $cleanWebsite = $this->cleanWebsiteUrl($business->website);
+        $cleanDomain = $this->getCleanDomain($business->website ?? $business->domain ?? '');
         $fullCleanWebsite = !empty($cleanWebsite) ? 'https://' . $cleanWebsite . '/' : '';
         $psiAnalysisUrl = !empty($fullCleanWebsite) 
             ? 'https://pagespeed.web.dev/analysis?url=' . urlencode($fullCleanWebsite)
@@ -297,6 +305,10 @@ class TemplateVariableService
             '{{business_name}}' => $business->business_name ?? '',
 
             '{{website}}' => $cleanWebsite,
+
+            '{{domain}}' => $cleanDomain,
+
+            '{{clean_domain}}' => $cleanDomain,
 
             '{{psi_analysis_url}}' => $psiAnalysisUrl,
 
@@ -404,5 +416,28 @@ class TemplateVariableService
         $url = preg_replace('~^https?://~i', '', $url);
 
         return rtrim($url, '/');
+    }
+
+    /**
+     * Extract clean root domain from website URL (e.g. laserclinics.com.au from https://www.laserclinics.com.au/skin-care-clinic/hervey-bay)
+     */
+    public function getCleanDomain(?string $url): string
+    {
+        if (empty($url)) {
+            return '';
+        }
+
+        $url = trim($url);
+
+        if (!preg_match('~^https?://~i', $url)) {
+            $url = 'http://' . $url;
+        }
+
+        $host = parse_url($url, PHP_URL_HOST);
+        if (empty($host)) {
+            return '';
+        }
+
+        return preg_replace('/^www\./i', '', $host);
     }
 }
