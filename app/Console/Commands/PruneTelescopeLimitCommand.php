@@ -33,6 +33,8 @@ class PruneTelescopeLimitCommand extends Command
         }
 
         if ($this->option('clear')) {
+            Schema::disableForeignKeyConstraints();
+
             if (Schema::hasTable('telescope_entries_tags')) {
                 DB::table('telescope_entries_tags')->truncate();
             }
@@ -40,6 +42,9 @@ class PruneTelescopeLimitCommand extends Command
                 DB::table('telescope_monitoring')->truncate();
             }
             DB::table('telescope_entries')->truncate();
+
+            Schema::enableForeignKeyConstraints();
+
             $this->info('All Telescope database tables truncated cleanly.');
             return 0;
         }
