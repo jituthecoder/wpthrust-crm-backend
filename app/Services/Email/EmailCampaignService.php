@@ -711,6 +711,42 @@ class EmailCampaignService
             ];
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Daily Sending Timeline & Sender Breakdown
+        |--------------------------------------------------------------------------
+        */
+        $dailyStats = \Illuminate\Support\Facades\DB::table('campaign_leads')
+            ->where('email_campaign_id', $campaign->id)
+            ->whereNotNull('sent_at')
+            ->select(
+                \Illuminate\Support\Facades\DB::raw("DATE(sent_at) as date"),
+                \Illuminate\Support\Facades\DB::raw("COUNT(*) as sent"),
+                \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN opened_at IS NOT NULL OR status IN ('opened', 'clicked') THEN 1 ELSE 0 END) as opened"),
+                \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN clicked_at IS NOT NULL OR status = 'clicked' THEN 1 ELSE 0 END) as clicked")
+            )
+            ->groupBy(\Illuminate\Support\Facades\DB::raw("DATE(sent_at)"))
+            ->orderBy('date', 'asc')
+            ->get();
+
+        $dailySenderStats = \Illuminate\Support\Facades\DB::table('campaign_leads')
+            ->join('email_senders', 'campaign_leads.email_sender_id', '=', 'email_senders.id')
+            ->where('campaign_leads.email_campaign_id', $campaign->id)
+            ->whereNotNull('campaign_leads.sent_at')
+            ->select(
+                \Illuminate\Support\Facades\DB::raw("DATE(campaign_leads.sent_at) as date"),
+                'campaign_leads.email_sender_id as sender_id',
+                'email_senders.name as sender_name',
+                'email_senders.email as sender_email',
+                'email_senders.display_name as sender_display_name',
+                \Illuminate\Support\Facades\DB::raw("COUNT(*) as sent"),
+                \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN campaign_leads.opened_at IS NOT NULL OR campaign_leads.status IN ('opened', 'clicked') THEN 1 ELSE 0 END) as opened"),
+                \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN campaign_leads.clicked_at IS NOT NULL OR campaign_leads.status = 'clicked' THEN 1 ELSE 0 END) as clicked")
+            )
+            ->groupBy(\Illuminate\Support\Facades\DB::raw("DATE(campaign_leads.sent_at)"), 'campaign_leads.email_sender_id', 'email_senders.name', 'email_senders.email', 'email_senders.display_name')
+            ->orderBy('date', 'asc')
+            ->get();
+
         return [
 
             'campaign_id' => $campaign->id,
@@ -744,6 +780,10 @@ class EmailCampaignService
             'click_rate' => $clickRate,
 
             'sender_stats' => $senderStats,
+
+            'daily_stats' => $dailyStats,
+
+            'daily_sender_stats' => $dailySenderStats,
 
             'click_rate' => $clickRate,
 
