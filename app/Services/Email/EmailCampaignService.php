@@ -367,7 +367,6 @@ class EmailCampaignService
                 'template',
                 'creator',
                 'senders.sender',
-                'leads.business',
             ]);
         });
     }
